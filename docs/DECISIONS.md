@@ -57,6 +57,7 @@
 - Output directory: `release/`.
 - NSIS installer is configured as a non-one-click installer with an optional installation directory.
 - Electron Builder uses the locally installed Electron distribution through `electronDist: node_modules/electron/dist`.
+- Electron Builder uses the verified N-API native prebuild with `npmRebuild: false`; source rebuilding remains a separate developer-machine prerequisite.
 
 ### Commands
 
@@ -160,3 +161,47 @@ npm run package:win:nsis
 - `npx electron . --remote-debugging-port=9225` started successfully and applied migration `0002_phase0_fake_sale`.
 - The live database contains `sales`, `sale_items`, and `stock_movements`; `schema_migrations` contains both Phase 0 migrations.
 - No UI, printing, backup/restore UI, licensing, or real POS feature was added.
+
+## Phase 0 Step 4 — Arabic RTL receipt printing and printer picker
+
+### Decisions
+
+- Printing uses Electron’s Windows-driver API: `webContents.print({ silent: true, deviceName })`.
+- Receipt output is generated as local HTML in a hidden `BrowserWindow`; no raw ESC/POS is used.
+- The receipt is RTL Arabic, monochrome-safe, uses local system font fallback, and isolates invoice numbers and money with `<bdi>`.
+- Renderer access is typed through `src/shared/printing.ts` and the sandboxed preload API.
+- Printer names are selected explicitly; no arbitrary URLs or remote resources are used.
+
+### Implemented
+
+- `src/main/printing/receipt-template.ts` generates the test receipt HTML.
+- `src/main/printing/printing.ts` enumerates installed printers and performs silent test printing.
+- IPC handlers: `printing:list-printers` and `printing:print-test-receipt`.
+- The Phase 0 shell now has a minimal Arabic printer picker and test-print control.
+- `src/main/printing/printing.test.ts` verifies RTL markup, HTML escaping, money formatting, and no remote URLs.
+- `vitest.config.ts` limits tests to source files and prevents compiled Electron tests from being rediscovered.
+
+### Verification
+
+- `npm test` passed: 2 files and 5 tests.
+- `npm run build` passed.
+- `npm run lint` passed.
+- Live Electron renderer-to-main enumeration returned five Windows printers:
+  `OneNote for Windows 10`, `OneNote (Desktop)`, `Microsoft XPS Document Writer`,
+  `Microsoft Print to PDF`, and `Fax`.
+- The Arabic RTL picker screen was captured at
+  `errors/phase-0/step-4/` session evidence.
+- Generated receipt path:
+  `%APPDATA%\small_erp\print-cache\test-receipt.html`.
+- Silent driver completion was not fully verifiable in this environment: the
+  “Microsoft Print to PDF” driver returned `success: false`; the receipt
+  template was generated. The IPC handler now logs the failure to
+  `%APPDATA%\small_erp\logs\main.log`.
+- `npm run package:win:dir` initially failed when electron-builder tried to
+  rebuild `better-sqlite3` without Visual Studio; `npmRebuild: false` was added
+  after verifying the N-API prebuild inside Electron.
+- After `npmRebuild: false`, `npm run package:win:dir` passed for Electron
+  44.5.1 x64.
+- The packaged executable opened successfully and its renderer-to-main printer
+  enumeration returned five printers.
+- Physical thermal-printer and A4 output on the target Windows 10 machine remain pending.

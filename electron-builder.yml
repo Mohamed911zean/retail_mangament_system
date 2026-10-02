@@ -4,6 +4,7 @@ directories:
   output: release
   buildResources: build
 electronDist: node_modules/electron/dist
+npmRebuild: false
 files:
   - dist/**/*
   - dist-electron/**/*

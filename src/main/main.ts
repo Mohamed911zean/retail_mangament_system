@@ -1,10 +1,12 @@
-import { app, BrowserWindow, dialog, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, session } from 'electron'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { closeDatabase, openDatabase, type DatabaseContext } from './database/database'
+import { listPrinters, printTestReceipt } from './printing/printing'
 
 const rendererUrl = process.env.SMALL_ERP_RENDERER_URL
 let databaseContext: DatabaseContext | undefined
+let mainWindow: BrowserWindow | undefined
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)
@@ -42,6 +44,7 @@ async function createWindow(): Promise<void> {
         sandbox: true,
       },
     })
+    mainWindow = window
 
     window.once('ready-to-show', () => window.show())
     window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
@@ -62,7 +65,7 @@ async function createWindow(): Promise<void> {
       return
     }
 
-    await window.loadFile(join(__dirname, '..', 'dist', 'index.html'))
+    await window.loadFile(join(__dirname, '..', '..', 'dist', 'index.html'))
   } catch (error) {
     logAndShowError('Window creation failed.', error)
   }
@@ -81,7 +84,32 @@ app.whenReady().then(async () => {
     },
   )
 
-  databaseContext = await openDatabase(app.getPath('userData'), join(__dirname, '..', 'migrations'))
+  databaseContext = await openDatabase(app.getPath('userData'), join(__dirname, '..', '..', 'migrations'))
+  ipcMain.handle('printing:list-printers', async () => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        throw new Error('The main window is not available.')
+      }
+      return await listPrinters(mainWindow)
+    } catch (error) {
+      logAndShowError('Printer enumeration failed.', error)
+      throw error
+    }
+  })
+  ipcMain.handle('printing:print-test-receipt', async (_event, printerName: unknown) => {
+    try {
+      if (typeof printerName !== 'string' || printerName.length === 0) {
+        throw new Error('A printer must be selected.')
+      }
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        throw new Error('The main window is not available.')
+      }
+      return await printTestReceipt(mainWindow, app.getPath('userData'), printerName)
+    } catch (error) {
+      logAndShowError('Test receipt printing failed.', error)
+      throw error
+    }
+  })
   await createWindow()
 
   app.on('activate', () => {
