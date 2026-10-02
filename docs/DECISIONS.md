@@ -205,3 +205,46 @@ npm run package:win:nsis
 - The packaged executable opened successfully and its renderer-to-main printer
   enumeration returned five printers.
 - Physical thermal-printer and A4 output on the target Windows 10 machine remain pending.
+
+## Phase 0 Step 5 — Online backup and restore
+
+### Decisions
+
+- Backup and restore use `better-sqlite3`'s online `.backup()` API; live database
+  files are not copied directly while open.
+- Manual backups are stored under `<userData>/backups/` with timestamped
+  `manual-*.sqlite` names.
+- Restore validates that the selected file is an existing SQLite backup inside
+  the configured backup directory.
+- Before restore, the current live database receives a
+  `pre-restore-*.sqlite` online safety backup.
+- The selected snapshot is backed up online into a temporary file, the live
+  connection is closed, WAL sidecars are removed, and the temporary database
+  replaces the live database. The restored database is reopened and checked.
+- A failed replacement or validation retains the safety backup and returns an
+  explicit error.
+
+### Implemented
+
+- `createDatabaseBackup`, `listDatabaseBackups`, and `restoreDatabaseBackup`
+  in `src/main/database/database.ts`.
+- Typed backup IPC in `src/shared/backup.ts` and the sandboxed preload.
+- Arabic Phase 0 backup/restore demo controls in the renderer.
+- `src/main/database/backup.test.ts` verifies online backup, restore, and
+  pre-restore safety backup behavior.
+
+### Verification
+
+- `npm test` passed: 3 files and 6 tests.
+- `npm run build` passed.
+- `npm run lint` passed.
+- Clean Electron launch loaded the Arabic backup panel and exposed
+  `typeof window.api === "object"`.
+- Live `window.api.createBackup()` returned:
+  `manual-2026-10-02T05-17-38-832Z.sqlite`, size `45056` bytes.
+- Live `window.api.listBackups()` returned the new backup and existing
+  pre-migration backup.
+- Live restore of the new manual backup passed and created:
+  `pre-restore-2026-10-02T05-17-54-783Z.sqlite`, size `45056` bytes.
+- Restore UI and online backup behavior were not tested on a real weak Windows
+  10 machine yet.

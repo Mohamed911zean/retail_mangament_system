@@ -15,3 +15,5 @@ export type PrintingApi = {
   listPrinters: () => Promise<PrinterInfo[]>
   printTestReceipt: (printerName: string) => Promise<PrintTestReceiptResult>
 }
+
+export type AppApi = PrintingApi & import('./backup').BackupApi

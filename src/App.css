@@ -108,3 +108,45 @@ h1 {
   color: #64748b;
   font-size: 0.9rem;
 }
+
+.backup-demo {
+  display: grid;
+  gap: 10px;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+  text-align: start;
+}
+
+.backup-demo h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 1.25rem;
+}
+
+.backup-demo select,
+.backup-demo button {
+  min-height: 44px;
+  border: 1px solid #94a3b8;
+  border-radius: 10px;
+  padding: 0 12px;
+}
+
+.backup-demo select {
+  background: #fff;
+  color: #172033;
+}
+
+.backup-demo button {
+  border-color: #02534b;
+  background: #02534b;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.backup-demo button:disabled,
+.backup-demo select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

@@ -1,7 +1,14 @@
 import { app, BrowserWindow, dialog, ipcMain, session } from 'electron'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { closeDatabase, openDatabase, type DatabaseContext } from './database/database'
+import {
+  closeDatabase,
+  createDatabaseBackup,
+  listDatabaseBackups,
+  openDatabase,
+  restoreDatabaseBackup,
+  type DatabaseContext,
+} from './database/database'
 import { listPrinters, printTestReceipt } from './printing/printing'
 
 const rendererUrl = process.env.SMALL_ERP_RENDERER_URL
@@ -107,6 +114,47 @@ app.whenReady().then(async () => {
       return await printTestReceipt(mainWindow, app.getPath('userData'), printerName)
     } catch (error) {
       logAndShowError('Test receipt printing failed.', error)
+      throw error
+    }
+  })
+  ipcMain.handle('backup:list', () => {
+    if (!databaseContext) {
+      throw new Error('The database is not available.')
+    }
+    return listDatabaseBackups(databaseContext).map(({ fileName, createdAt, sizeBytes }) => ({
+      fileName,
+      createdAt,
+      sizeBytes,
+    }))
+  })
+  ipcMain.handle('backup:create', async () => {
+    try {
+      if (!databaseContext) {
+        throw new Error('The database is not available.')
+      }
+      const backup = await createDatabaseBackup(databaseContext)
+      return { fileName: backup.fileName, createdAt: backup.createdAt, sizeBytes: backup.sizeBytes }
+    } catch (error) {
+      logAndShowError('Database backup failed.', error)
+      throw error
+    }
+  })
+  ipcMain.handle('backup:restore', async (_event, fileName: unknown) => {
+    try {
+      if (typeof fileName !== 'string' || fileName.length === 0) {
+        throw new Error('A backup must be selected.')
+      }
+      if (!databaseContext) {
+        throw new Error('The database is not available.')
+      }
+      databaseContext = await restoreDatabaseBackup(databaseContext, fileName)
+      return listDatabaseBackups(databaseContext).map(({ fileName: name, createdAt, sizeBytes }) => ({
+        fileName: name,
+        createdAt,
+        sizeBytes,
+      }))
+    } catch (error) {
+      logAndShowError('Database restore failed.', error)
       throw error
     }
   })
