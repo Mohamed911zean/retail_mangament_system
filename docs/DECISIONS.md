@@ -132,3 +132,31 @@ npm run package:win:nsis
 - The live database also produced SQLite WAL sidecar files, confirming the configured WAL mode.
 - Packaged startup database creation: not verified in this step.
 - Fake sale, rollback test, printing, restore UI, licensing, and installer work remain out of scope for this step.
+
+## Phase 0 Step 3 — Transactional fake sale and rollback test
+
+### Decisions
+
+- Test framework: `vitest 5.0.3`, pinned exactly.
+- The fake sale uses only technical Phase 0 tables: `sales`, `sale_items`, and `stock_movements`.
+- The three-table write is one `better-sqlite3` transaction.
+- Failure injection is explicit and test-only; it can fail after the sale, after an item, or after a stock movement.
+- No POS, pricing, inventory, payment, or other real business feature is implemented.
+
+### Implemented
+
+- `src/main/sales/fake-sale.ts` provides the atomic fake-sale write.
+- `migrations/0002_phase0_fake_sale.sql` creates the three smoke-test tables.
+- `src/main/sales/fake-sale.test.ts` verifies both successful persistence and complete rollback.
+- Error artifacts are organized under `errors/phase-0/step-<number>/`.
+- `docs/design_system/` is preserved as the authoritative future UI reference; no UI implementation was added.
+
+### Verification
+
+- `npm install --save-dev vitest@5.0.3` completed with no reported vulnerabilities.
+- `npm test` passed: 1 test file and 4 tests passed, including success and three injected rollback points.
+- `npm run build` passed.
+- `npm run lint` passed.
+- `npx electron . --remote-debugging-port=9225` started successfully and applied migration `0002_phase0_fake_sale`.
+- The live database contains `sales`, `sale_items`, and `stock_movements`; `schema_migrations` contains both Phase 0 migrations.
+- No UI, printing, backup/restore UI, licensing, or real POS feature was added.
