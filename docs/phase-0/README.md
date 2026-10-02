@@ -4,10 +4,13 @@ Each completed Phase 0 step records its scope, commands, results, and limitation
 
 ## Steps
 
-1. Electron + Vite + React + TypeScript scaffold — completed in the current step.
-2. SQLite and plain SQL migration runner — pending.
-3. Transactional fake sale and rollback test — pending.
-4. Arabic RTL silent printing and printer picker — pending.
-5. Online-backup API backup and restore — pending.
-6. Ed25519 license demo — pending.
-7. NSIS installer and portable executable — pending.
+1. Electron + Vite + React + TypeScript scaffold — completed.
+2. SQLite and plain SQL migration runner — completed.
+3. Transactional fake sale and rollback test — completed.
+4. Arabic RTL silent printing and printer picker — completed.
+5. Online-backup API backup and restore — completed.
+6. Ed25519 license demo — completed through sub-steps (a)-(e).
+7. NSIS installer and portable executable — completed for x64 artifacts.
+
+For the complete review of scope, commands, evidence, limitations, and output
+locations, see `docs/phase-0/PHASE-0-REPORT.md`.

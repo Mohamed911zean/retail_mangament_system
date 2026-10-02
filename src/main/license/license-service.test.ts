@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -86,6 +86,78 @@ describe('LicenseService', () => {
     await expect(context.service.activate(token)).resolves.toMatchObject({
       state: 'expired',
       mode: 'read-only',
+    })
+  })
+
+  it('rejects a wrong-machine license', async () => {
+      const context = createService()
+      const token = signLicense(
+        {
+          licenseId: 'license-wrong-machine',
+          kid: 'demo-2026',
+          client: 'frozen-food',
+          machine: 'different-machine-code',
+          issuedAt: 1_600_000_000_000,
+          expiresAt: 1_900_000_000_000,
+          features: [],
+        },
+        context.privateKey,
+      )
+
+      await expect(context.service.activate(token)).resolves.toMatchObject({
+        state: 'machine-mismatch',
+        mode: 'read-only',
+      })
+  })
+
+  it('rejects a tampered activation token and keeps the app unlicensed', async () => {
+      const context = createService()
+      const machine = licenseMachineCode(fingerprint)
+      const token = signLicense(
+        {
+          licenseId: 'license-tampered',
+          kid: 'demo-2026',
+          client: 'frozen-food',
+          machine,
+          issuedAt: 1_600_000_000_000,
+          expiresAt: 1_900_000_000_000,
+          features: [],
+        },
+        context.privateKey,
+      )
+      const [payload, signature] = token.split('.')
+      const tampered = `${payload.slice(0, -1)}${payload.endsWith('A') ? 'B' : 'A'}.${signature}`
+
+      await expect(context.service.activate(tampered)).resolves.toMatchObject({ state: 'invalid' })
+      expect(readFileSync(join(context.userDataPath, 'license', 'last-seen-a'), 'utf8')).toContain('1700000000000')
+  })
+
+  it('reports missing activation as read-only without hiding data', async () => {
+      const context = createService()
+      await expect(context.service.getStatus()).resolves.toMatchObject({
+        state: 'unlicensed',
+        mode: 'read-only',
+      })
+  })
+
+  it('detects clock rollback using both last-seen locations', async () => {
+      let now = 1_700_000_000_000
+      const context = createService(now)
+      await context.service.getStatus()
+      const clockA = join(context.userDataPath, 'license', 'last-seen-a')
+      const clockB = join(context.userDataPath, 'license', 'last-seen-b')
+      expect(readFileSync(clockA, 'utf8')).toBe(readFileSync(clockB, 'utf8'))
+
+      now = 1_699_999_999_000
+      const rollbackService = new LicenseService({
+        userDataPath: context.userDataPath,
+        publicKeyPath: join(context.userDataPath, 'public-key.pem'),
+        fingerprintReaders: readers,
+        now: () => now,
+      })
+      await expect(rollbackService.getStatus()).resolves.toMatchObject({
+        state: 'clock-rollback',
+        mode: 'read-only',
     })
   })
 })

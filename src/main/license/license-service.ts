@@ -37,12 +37,18 @@ function isExpired(payload: LicensePayload, now: number): boolean {
 
 export class LicenseService {
   private readonly activationPath: string
+  private readonly clockStatePaths: [string, string]
   private readonly publicKey: Buffer
   private readonly fingerprintReaders?: FingerprintSourceReaders
   private readonly now: () => number
 
   public constructor(options: LicenseServiceOptions) {
     this.activationPath = join(options.userDataPath, 'license', 'activation.key')
+    const licenseDirectory = join(options.userDataPath, 'license')
+    this.clockStatePaths = [
+      join(licenseDirectory, 'last-seen-a'),
+      join(licenseDirectory, 'last-seen-b'),
+    ]
     this.publicKey = readFileSync(options.publicKeyPath)
     this.fingerprintReaders = options.fingerprintReaders
     this.now = options.now ?? Date.now
@@ -60,17 +66,30 @@ export class LicenseService {
       }
     }
 
+    const clockState = this.checkClock(machineCode)
+    if (clockState) {
+      return clockState
+    }
+
     if (!existsSync(this.activationPath)) {
       return { mode: 'read-only', state: 'unlicensed', ...baseStatus(machineCode) }
     }
 
-    const token = readFileSync(this.activationPath, 'utf8').trim()
-    const verification = verifyLicense(token, this.publicKey)
-    return this.statusFromVerification(verification, machineCode)
+    try {
+      const token = readFileSync(this.activationPath, 'utf8').trim()
+      const verification = verifyLicense(token, this.publicKey)
+      return this.statusFromVerification(verification, machineCode)
+    } catch {
+      return { mode: 'read-only', state: 'storage-error', ...baseStatus(machineCode) }
+    }
   }
 
   public async activate(key: string): Promise<LicenseStatus> {
     const machineCode = licenseMachineCode(await readMachineFingerprint(this.fingerprintReaders))
+    const clockState = this.checkClock(machineCode)
+    if (clockState) {
+      return clockState
+    }
     const verification = verifyLicense(key.trim(), this.publicKey)
     if (!verification.valid) {
       return {
@@ -126,6 +145,26 @@ export class LicenseService {
       client: payload.client,
       expiresAt: payload.expiresAt,
     }
+  }
+
+  private checkClock(machineCode: string): LicenseStatus | undefined {
+    const now = this.now()
+    const seen = this.clockStatePaths
+      .filter((path) => existsSync(path))
+      .map((path) => Number.parseInt(readFileSync(path, 'utf8').trim(), 10))
+      .filter((timestamp) => Number.isSafeInteger(timestamp))
+    const latestSeen = seen.length > 0 ? Math.max(...seen) : undefined
+
+    if (latestSeen !== undefined && now < latestSeen) {
+      return { mode: 'read-only', state: 'clock-rollback', ...baseStatus(machineCode) }
+    }
+
+    const directory = join(this.clockStatePaths[0], '..')
+    mkdirSync(directory, { recursive: true })
+    for (const path of this.clockStatePaths) {
+      writeFileSync(path, `${now}\n`, { encoding: 'utf8', mode: 0o600 })
+    }
+    return undefined
   }
 }
 

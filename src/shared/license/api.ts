@@ -2,7 +2,15 @@ export type LicenseMode = 'active' | 'read-only'
 
 export type LicenseStatus = {
   mode: LicenseMode
-  state: 'active' | 'unlicensed' | 'expired' | 'invalid' | 'machine-mismatch' | 'fingerprint-unavailable'
+  state:
+    | 'active'
+    | 'unlicensed'
+    | 'expired'
+    | 'invalid'
+    | 'machine-mismatch'
+    | 'fingerprint-unavailable'
+    | 'clock-rollback'
+    | 'storage-error'
   machineCode: string
   machineChecksum: string
   kid?: string

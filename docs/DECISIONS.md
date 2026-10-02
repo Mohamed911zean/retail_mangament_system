@@ -361,3 +361,75 @@ npm run package:win:nsis
   window title was not independently captured in that diagnostic launch.
 - Full wrong-machine, tampered-key, missing-file, and clock-rollback coverage
   remains Step 6(d).
+
+## Phase 0 Step 6(d) — License edge-case tests and clock rollback
+
+### Implemented
+
+- Wrong-machine activation returns read-only mode.
+- Tampered activation tokens are rejected and are not persisted.
+- Missing activation files produce an explicit unlicensed/read-only status.
+- Expired licenses produce read-only mode without deleting data.
+- Last-seen timestamps are stored in two separate files under the license
+  directory. A current time earlier than either recorded timestamp produces a
+  clock-rollback status.
+- Existing shared tests cover one changed fingerprint source (2-of-3 matching),
+  two changed sources, malformed/tampered payloads, and unexpected `kid`.
+
+### Verification
+
+- `npm test` passed: 5 files and 17 tests.
+- The clock rollback test verified both timestamp files contain the same last
+  seen value before moving the test clock backwards.
+- No network or online license validation was added.
+
+## Phase 0 Step 6(e) — Electron Fuses
+
+### Decisions
+
+- `@electron/fuses 1.8.0` is used with Electron `44.5.1`.
+- The electron-builder `afterPack` hook flips these Windows executable fuses:
+  `RunAsNode=false`, cookie encryption enabled,
+  `EnableNodeOptionsEnvironmentVariable=false`,
+  `EnableNodeCliInspectArguments=false`, and `OnlyLoadAppFromAsar=true`.
+
+### Verification
+
+- `npx @electron/fuses read --app <unpacked-exe>` confirmed:
+  `RunAsNode` disabled, cookie encryption enabled, `NODE_OPTIONS` disabled,
+  CLI inspect arguments disabled, and ASAR-only loading enabled.
+- The packaged executable opened with the Arabic title `نقطة البيع`.
+
+## Phase 0 Step 7 — NSIS, unpacked, and portable x64 packaging
+
+### Decisions
+
+- Electron Builder remains pinned to `26.15.3`; Electron remains pinned to
+  `44.5.1`.
+- Added `package:win:portable` using Electron Builder's `portable` target.
+- Packaging uses the local Electron distribution and keeps native rebuild
+  disabled because the verified N-API prebuild works in this environment.
+
+### Commands
+
+```powershell
+npm run package:win:dir
+npm run package:win:nsis
+npm run package:win:portable
+```
+
+### Verification
+
+- Fresh combined packaging completed successfully in
+  `A:\web\SMALL_ERP\small_erp\release-phase0`.
+- Unpacked executable:
+  `A:\web\SMALL_ERP\small_erp\release-phase0\win-unpacked\small-shop-pos.exe`
+- NSIS installer:
+  `A:\web\SMALL_ERP\small_erp\release-phase0\Small Shop POS-Setup-0.1.0-x64.exe`
+- Portable executable:
+  `A:\web\SMALL_ERP\small_erp\release-phase0\Small Shop POS 0.1.0.exe`
+- The unpacked executable was launched and displayed `نقطة البيع`.
+- Portable packaging completed; a separate portable GUI title capture was not
+  reliable because multiple diagnostic Electron processes were already active.
+- Real weak Windows 10 hardware, physical receipt printing, and 32-bit
+  Windows 10 remain unverified.

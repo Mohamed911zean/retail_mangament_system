@@ -11,6 +11,10 @@ function licenseMessage(state: LicenseStatus['state']): string {
       return messages.license.machineMismatch
     case 'fingerprint-unavailable':
       return messages.license.fingerprintUnavailable
+    case 'clock-rollback':
+      return messages.license.clockRollback
+    case 'storage-error':
+      return messages.license.storageError
     default:
       return messages.license[state]
   }

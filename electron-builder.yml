@@ -5,6 +5,7 @@ directories:
   buildResources: build
 electronDist: node_modules/electron/dist
 npmRebuild: false
+afterPack: scripts/after-pack.cjs
 files:
   - dist/**/*
   - dist-electron/**/*
