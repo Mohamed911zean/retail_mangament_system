@@ -8,7 +8,7 @@
     "esModuleInterop": true,
     "lib": ["ES2022"],
     "types": ["node", "electron"],
-    "rootDir": "src/main",
+    "rootDir": "src",
     "outDir": "dist-electron",
     "strict": true,
     "skipLibCheck": true,
@@ -17,5 +17,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/main/**/*.ts"]
+  "include": ["src/main/**/*.ts", "src/shared/**/*.ts"],
+  "exclude": ["src/main/**/*.test.ts"]
 }
