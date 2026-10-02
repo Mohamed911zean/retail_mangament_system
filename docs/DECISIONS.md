@@ -248,3 +248,45 @@ npm run package:win:nsis
   `pre-restore-2026-10-02T05-17-54-783Z.sqlite`, size `45056` bytes.
 - Restore UI and online backup behavior were not tested on a real weak Windows
   10 machine yet.
+
+## Phase 0 Step 6(a) — Shared license foundation
+
+### Decisions
+
+- License tokens use an offline Ed25519 signature over a base64url-encoded JSON
+  payload and signature.
+- The payload includes `licenseId`, `kid`, `client`, machine code,
+  `issuedAt`, `expiresAt`, and feature identifiers. The `kid` is checked
+  separately so public keys can be rotated later.
+- The machine fingerprint has three injectable source readers:
+  Windows `MachineGuid`, system-volume serial, and CPU ID. A license matches
+  when at least two normalized sources agree.
+- The shared implementation lives in `src/shared/license/` rather than a
+  separately published package because the app is a single offline desktop
+  bundle. The Windows readers remain in `src/main/license/` and are not
+  renderer dependencies.
+- Empty fingerprint values are rejected explicitly; there is no silent fallback
+  to a weaker machine identity.
+- No private or public key files are created in this sub-step. Private keys
+  will remain outside the repository under `A:\web\LICENSE-KEYS` when the
+  generator is implemented.
+
+### Implemented
+
+- `src/shared/license/license.ts`: payload validation, Ed25519 sign/verify,
+  key-id validation, machine-code hashing, and 2-of-3 matching.
+- `src/main/license/fingerprint.ts`: injectable readers for the three Windows
+  fingerprint sources with explicit empty-value errors.
+- `src/shared/license/license.test.ts`: signing, tampering, key-id,
+  injectable-reader, source-change, and empty-source tests.
+
+### Verification
+
+- `npm test` passed: 4 files and 11 tests.
+- `npm run build` passed.
+- `npm run lint` passed.
+- Actual Windows registry, volume, and WMIC outputs were not available for a
+  live fingerprint check in this environment; injectable-reader coverage was
+  verified instead.
+- License CLI, app activation UI, persistence, expiry/read-only mode, clock
+  rollback checks, and Electron Fuses are intentionally not implemented yet.
