@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-electron
+dist-tools
 release/
 release-*/
 dist-ssr
@@ -17,6 +18,7 @@ dist-ssr
 
 # Local signing material is never shipped.
 private/
+issued-licenses.csv
 
 # Editor directories and files
 .vscode/*
@@ -28,3 +30,7 @@ private/
 *.njsproj
 *.sln
 *.sw?
+
+
+.diag-asar
+.verify-fixed-asar

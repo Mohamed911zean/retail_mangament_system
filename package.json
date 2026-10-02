@@ -9,6 +9,8 @@
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "tsc -b tsconfig.app.json && vite build",
     "build:electron": "tsc -p tsconfig.electron.json && node scripts/prepare-electron.cjs",
+    "build:license-tools": "tsc -p tsconfig.tools.json && node scripts/prepare-license-tools.cjs",
+    "license:gen": "npm run build:license-tools && node dist-tools/tools/license-gen/index.js",
     "test": "vitest run",
     "package:win:dir": "npm run build && electron-builder --win --x64 --dir",
     "package:win:nsis": "npm run build && electron-builder --win nsis --x64",

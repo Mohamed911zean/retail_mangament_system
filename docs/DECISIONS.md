@@ -290,3 +290,30 @@ npm run package:win:nsis
   verified instead.
 - License CLI, app activation UI, persistence, expiry/read-only mode, clock
   rollback checks, and Electron Fuses are intentionally not implemented yet.
+
+## Phase 0 Step 6(b) — External license generator
+
+### Decisions
+
+- The developer-only generator is TypeScript under `tools/license-gen/` and
+  compiles separately to `dist-tools/`; it is not included in the Electron
+  builder file list.
+- `keygen` writes a DEMO Ed25519 PKCS#8 private key and SPKI public key to an
+  explicitly supplied external directory. The intended location is
+  `A:\web\LICENSE-KEYS`.
+- `issue` requires `--key-file`, `--client`, `--machine`, and `--expires`.
+  Features are supplied as a comma-separated `--features` value. `--kid` is
+  optional and defaults to `demo`.
+- The activation token is printed to stdout. The private key contents are
+  never printed, copied into the repository, or included in application
+  packaging.
+- Issuance metadata is appended to the repository-local
+  `issued-licenses.csv`, which is git-ignored. The path can be overridden for
+  controlled tests with `--ledger`.
+
+### Implemented
+
+- `tools/license-gen/index.ts` with `keygen` and `issue` commands.
+- `tsconfig.tools.json` and a CommonJS preparation script.
+- `npm run license:gen -- ...` command.
+- Git-ignored `issued-licenses.csv`.
