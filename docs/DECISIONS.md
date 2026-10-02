@@ -317,3 +317,47 @@ npm run package:win:nsis
 - `tsconfig.tools.json` and a CommonJS preparation script.
 - `npm run license:gen -- ...` command.
 - Git-ignored `issued-licenses.csv`.
+
+## Phase 0 Step 6(c) — App license service and activation screen
+
+### Decisions
+
+- The app-side license service is isolated in
+  `src/main/license/license-service.ts`. It exposes status and activation
+  through typed IPC only; the renderer never reads the activation file or
+  public-key file directly.
+- The public key is copied into `dist-electron/main/license/public-key.pem`
+  during the Electron build from `LICENSE_PUBLIC_KEY_FILE`, defaulting in this
+  developer environment to `A:\web\LICENSE-KEYS\demo-2026.public.pem`.
+- The activation token is stored under `<userData>/license/activation.key`
+  with restrictive file permissions and an atomic temporary-file replacement.
+- License status is checked at startup, every 60 seconds, and again before
+  backup creation/restoration. Expired, missing, invalid, mismatched, or
+  unreadable licenses put the app in read-only mode.
+- Read-only mode does not delete or hide database data. The demo UI disables
+  backup writes/restoration while retaining data visibility and the activation
+  screen.
+- The UI displays the machine code, an 8-character checksum, copy control,
+  activation input, client, expiry, and `kid`, with all text in Arabic i18n.
+
+### Implemented
+
+- `src/shared/license/api.ts` and typed preload IPC methods.
+- `src/main/license/license-service.ts`.
+- Build-time public-key embedding in `scripts/prepare-electron.cjs`.
+- Arabic activation/status UI and read-only controls in `src/App.tsx`.
+- Service tests for unlicensed state, persisted activation, and expiry.
+
+### Verification
+
+- `npm test` passed: 5 files and 13 tests.
+- `npm run build` passed.
+- `npm run lint` passed.
+- External public key was embedded at
+  `dist-electron/main/license/public-key.pem`.
+- No private key was copied into `dist-tools`, Electron output, or package
+  contents.
+- A live Electron process launched without a new startup error; a visible
+  window title was not independently captured in that diagnostic launch.
+- Full wrong-machine, tampered-key, missing-file, and clock-rollback coverage
+  remains Step 6(d).

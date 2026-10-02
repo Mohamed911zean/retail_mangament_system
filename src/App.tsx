@@ -1,8 +1,20 @@
 import { useEffect, useState } from 'react'
 import type { BackupInfo } from './shared/backup'
 import type { PrinterInfo } from './shared/printing'
+import type { LicenseStatus } from './shared/license/api'
 import messages from './renderer/i18n/ar.json'
 import './App.css'
+
+function licenseMessage(state: LicenseStatus['state']): string {
+  switch (state) {
+    case 'machine-mismatch':
+      return messages.license.machineMismatch
+    case 'fingerprint-unavailable':
+      return messages.license.fingerprintUnavailable
+    default:
+      return messages.license[state]
+  }
+}
 
 function App() {
   const [printers, setPrinters] = useState<PrinterInfo[]>([])
@@ -11,6 +23,22 @@ function App() {
   const [backups, setBackups] = useState<BackupInfo[]>([])
   const [selectedBackup, setSelectedBackup] = useState('')
   const [backupStatus, setBackupStatus] = useState(messages.backup.loading)
+  const [license, setLicense] = useState<LicenseStatus | undefined>()
+  const [licenseKey, setLicenseKey] = useState('')
+  const [licenseStatus, setLicenseStatus] = useState(messages.license.loading)
+  const [copyStatus, setCopyStatus] = useState('')
+
+  useEffect(() => {
+    const refreshLicense = (): void => {
+      void window.api.getLicenseStatus().then((currentLicense) => {
+        setLicense(currentLicense)
+        setLicenseStatus(licenseMessage(currentLicense.state))
+      }).catch(() => setLicenseStatus(messages.license.activateError))
+    }
+    refreshLicense()
+    const timer = window.setInterval(refreshLicense, 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     void window.api.listPrinters()
@@ -60,10 +88,15 @@ function App() {
   }
 
   async function handleRestoreBackup(): Promise<void> {
+    if (license?.mode !== 'active') {
+      setBackupStatus(messages.app.readOnly)
+      return
+    }
     if (!selectedBackup) {
       setBackupStatus(messages.backup.select)
       return
     }
+
     if (!window.confirm(messages.backup.confirm)) {
       return
     }
@@ -78,6 +111,24 @@ function App() {
     }
   }
 
+  async function handleCopyMachineCode(): Promise<void> {
+    if (!license?.machineCode) return
+    await navigator.clipboard.writeText(license.machineCode)
+    setCopyStatus(messages.license.copied)
+  }
+
+  async function handleActivateLicense(): Promise<void> {
+    if (!licenseKey.trim()) return
+    try {
+      const currentLicense = await window.api.activateLicense(licenseKey)
+      setLicense(currentLicense)
+      setLicenseStatus(licenseMessage(currentLicense.state))
+      if (currentLicense.state === 'active') setLicenseKey('')
+    } catch {
+      setLicenseStatus(messages.license.activateError)
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="welcome-card" aria-labelledby="welcome-title">
@@ -86,7 +137,33 @@ function App() {
         <p className="description">{messages.app.description}</p>
         <div className="status" role="status">
           <span className="status-dot" aria-hidden="true" />
-          {messages.app.status}
+          {license?.mode === 'active' ? messages.app.status : messages.app.readOnly}
+        </div>
+        <div className="license-demo">
+          <h2>{messages.license.title}</h2>
+          <p>{licenseStatus}</p>
+          <label htmlFor="machine-code">{messages.license.machineCode}</label>
+          <div className="license-code-row">
+            <input id="machine-code" readOnly value={license?.machineCode ?? ''} />
+            <button type="button" onClick={() => void handleCopyMachineCode()} disabled={!license?.machineCode}>
+              {messages.license.copy}
+            </button>
+          </div>
+          <small>{messages.license.checksum}: {license?.machineChecksum || '—'} {copyStatus}</small>
+          <label htmlFor="license-key">{messages.license.keyLabel}</label>
+          <textarea
+            id="license-key"
+            value={licenseKey}
+            placeholder={messages.license.keyPlaceholder}
+            onChange={(event) => setLicenseKey(event.target.value)}
+            rows={3}
+          />
+          <button type="button" onClick={() => void handleActivateLicense()} disabled={!licenseKey.trim()}>
+            {messages.license.activate}
+          </button>
+          {license?.client && <small>{messages.license.client}: {license.client}</small>}
+          {license?.kid && <small>{messages.license.kid}: {license.kid}</small>}
+          {license?.expiresAt && <small>{messages.license.expires}: {new Date(license.expiresAt).toLocaleString('ar-EG')}</small>}
         </div>
         <div className="printing-demo">
           <h2>{messages.printing.title}</h2>
@@ -111,7 +188,7 @@ function App() {
         </div>
         <div className="backup-demo">
           <h2>{messages.backup.title}</h2>
-          <button type="button" onClick={() => void handleCreateBackup()}>
+          <button type="button" onClick={() => void handleCreateBackup()} disabled={license?.mode !== 'active'}>
             {messages.backup.createButton}
           </button>
           <label htmlFor="backup-select">{messages.backup.label}</label>
@@ -119,7 +196,7 @@ function App() {
             id="backup-select"
             value={selectedBackup}
             onChange={(event) => setSelectedBackup(event.target.value)}
-            disabled={backups.length === 0}
+            disabled={backups.length === 0 || license?.mode !== 'active'}
           >
             <option value="">{messages.backup.choose}</option>
             {backups.map((backup) => (
@@ -128,7 +205,7 @@ function App() {
               </option>
             ))}
           </select>
-          <button type="button" onClick={() => void handleRestoreBackup()} disabled={!selectedBackup}>
+          <button type="button" onClick={() => void handleRestoreBackup()} disabled={!selectedBackup || license?.mode !== 'active'}>
             {messages.backup.restoreButton}
           </button>
           <p className="printing-status">{backupStatus}</p>

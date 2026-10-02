@@ -10,10 +10,13 @@ import {
   type DatabaseContext,
 } from './database/database'
 import { listPrinters, printTestReceipt } from './printing/printing'
+import { isLicenseWriteAllowed, LicenseService } from './license/license-service'
 
 const rendererUrl = process.env.SMALL_ERP_RENDERER_URL
 let databaseContext: DatabaseContext | undefined
 let mainWindow: BrowserWindow | undefined
+let licenseService: LicenseService | undefined
+let licenseCheckTimer: NodeJS.Timeout | undefined
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)
@@ -92,6 +95,26 @@ app.whenReady().then(async () => {
   )
 
   databaseContext = await openDatabase(app.getPath('userData'), join(__dirname, '..', '..', 'migrations'))
+  licenseService = new LicenseService({
+    userDataPath: app.getPath('userData'),
+    publicKeyPath: join(__dirname, 'license', 'public-key.pem'),
+  })
+  await licenseService.getStatus()
+  licenseCheckTimer = setInterval(() => {
+    void licenseService?.getStatus()
+  }, 60_000)
+  ipcMain.handle('license:get-status', async () => {
+    if (!licenseService) {
+      throw new Error('The license service is not available.')
+    }
+    return licenseService.getStatus()
+  })
+  ipcMain.handle('license:activate', async (_event, key: unknown) => {
+    if (!licenseService || typeof key !== 'string' || key.trim().length === 0) {
+      throw new Error('A license key is required.')
+    }
+    return licenseService.activate(key)
+  })
   ipcMain.handle('printing:list-printers', async () => {
     try {
       if (!mainWindow || mainWindow.isDestroyed()) {
@@ -129,6 +152,9 @@ app.whenReady().then(async () => {
   })
   ipcMain.handle('backup:create', async () => {
     try {
+      if (licenseService && !isLicenseWriteAllowed(await licenseService.getStatus())) {
+        throw new Error('The application is in read-only mode.')
+      }
       if (!databaseContext) {
         throw new Error('The database is not available.')
       }
@@ -141,6 +167,9 @@ app.whenReady().then(async () => {
   })
   ipcMain.handle('backup:restore', async (_event, fileName: unknown) => {
     try {
+      if (licenseService && !isLicenseWriteAllowed(await licenseService.getStatus())) {
+        throw new Error('The application is in read-only mode.')
+      }
       if (typeof fileName !== 'string' || fileName.length === 0) {
         throw new Error('A backup must be selected.')
       }
@@ -176,6 +205,9 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', () => {
+  if (licenseCheckTimer) {
+    clearInterval(licenseCheckTimer)
+  }
   if (databaseContext) {
     closeDatabase(databaseContext)
   }
