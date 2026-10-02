@@ -1,0 +1,20 @@
+appId: com.smallshop.pos
+productName: Small Shop POS
+directories:
+  output: release
+  buildResources: build
+electronDist: node_modules/electron/dist
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  executableName: small-shop-pos
+nsis:
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true

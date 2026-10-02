@@ -9,6 +9,8 @@
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "tsc -b tsconfig.app.json && vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
+    "package:win:dir": "npm run build && electron-builder --win --x64 --dir",
+    "package:win:nsis": "npm run build && electron-builder --win nsis --x64",
     "start": "electron .",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -23,7 +25,8 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
-    "electron": "^44.5.1",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
     "eslint": "^10.10.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.6",

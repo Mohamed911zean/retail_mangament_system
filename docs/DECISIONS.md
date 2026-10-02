@@ -47,3 +47,30 @@
 - Real Windows 10 installer validation: not performed in Step 1.
 - `better-sqlite3` compatibility: not tested in Step 1; required in Step 2.
 - Printer, database, backup, license, NSIS, and portable output: not tested in Step 1.
+
+## Packaging configuration — completed before Step 2
+
+### Decisions
+
+- Packaging tool: `electron-builder 26.15.3`, pinned exactly without a caret.
+- Windows architecture produced: `x64`.
+- Output directory: `release/`.
+- NSIS installer is configured as a non-one-click installer with an optional installation directory.
+- Electron Builder uses the locally installed Electron distribution through `electronDist: node_modules/electron/dist`.
+
+### Commands
+
+```powershell
+npm run package:win:dir
+npm run package:win:nsis
+```
+
+### Verification
+
+- `npm run package:win:dir` passed.
+- `npm run package:win:nsis` passed.
+- Unpacked executable: `A:\web\SMALL_ERP\small_erp\release\win-unpacked\small-shop-pos.exe`.
+- NSIS installer: `A:\web\SMALL_ERP\small_erp\release\Small Shop POS-Setup-0.1.0-x64.exe`.
+- NSIS block map: `A:\web\SMALL_ERP\small_erp\release\Small Shop POS-Setup-0.1.0-x64.exe.blockmap`.
+- The generated executable and installer are unsigned/default-icon development artifacts; production signing and custom branding were not part of this packaging check.
+- Real Windows 10 installation and launch validation remains pending.
