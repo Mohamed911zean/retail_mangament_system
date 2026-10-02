@@ -5,6 +5,7 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "ignoreDeprecations": "6.0",
+    "esModuleInterop": true,
     "lib": ["ES2022"],
     "types": ["node", "electron"],
     "rootDir": "src/main",

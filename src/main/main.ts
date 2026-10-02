@@ -1,8 +1,10 @@
 import { app, BrowserWindow, dialog, session } from 'electron'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { closeDatabase, openDatabase, type DatabaseContext } from './database/database'
 
 const rendererUrl = process.env.SMALL_ERP_RENDERER_URL
+let databaseContext: DatabaseContext | undefined
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)
@@ -79,6 +81,7 @@ app.whenReady().then(async () => {
     },
   )
 
+  databaseContext = await openDatabase(app.getPath('userData'), join(__dirname, '..', 'migrations'))
   await createWindow()
 
   app.on('activate', () => {
@@ -93,5 +96,11 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
+  }
+})
+
+app.on('will-quit', () => {
+  if (databaseContext) {
+    closeDatabase(databaseContext)
   }
 })

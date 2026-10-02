@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS app_metadata (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  createdAt INTEGER NOT NULL,
+  updatedAt INTEGER NOT NULL
+);

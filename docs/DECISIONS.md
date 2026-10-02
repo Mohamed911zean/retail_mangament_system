@@ -98,3 +98,37 @@ npm run package:win:nsis
 - A plain `npx electron .` launch was also started successfully and remained running.
 - The plain packaged executable launch was not independently run by this tool call; the user confirmed that the packaged app worked.
 - No `userData/logs/main.log` was created during successful launches, indicating no startup or renderer failure was logged.
+
+## Phase 0 Step 2 — SQLite and plain SQL migration runner
+
+### Decisions
+
+- SQLite driver: `better-sqlite3 13.0.3`, pinned exactly.
+- Query and migrations: plain SQL; no ORM.
+- Electron native compatibility: the installed `better-sqlite3` prebuild loaded successfully inside Electron 44.5.1 and executed an in-memory query. A source rebuild through `@electron/rebuild 4.2.0` was attempted but could not run because Visual Studio was not installed in this environment.
+- Database location: `<userData>/database/small-shop-pos.sqlite`.
+- Backup location: `<userData>/backups/`.
+- Migrations are bundled under `migrations/` and tracked in `schema_migrations`.
+- Before pending migrations on an existing database, the runner creates a timestamped online backup with `better-sqlite3.backup()`. First-run database creation has no pre-existing file to back up.
+- SQLite pragmas: WAL, `synchronous = FULL`, and foreign keys enabled; `quick_check` runs before and after migrations.
+
+### Implemented
+
+- `src/main/database/database.ts` opens/configures SQLite, runs ordered SQL migrations in transactions, and closes the database safely.
+- `migrations/0001_phase0_metadata.sql` is a technical smoke migration only; no real business feature is implemented.
+- Electron startup opens the database before creating the window.
+- `migrations/` is included in electron-builder application files.
+
+### Verification
+
+- `npm install better-sqlite3@13.0.3 --save` completed with no reported vulnerabilities.
+- `npm install --save-dev @electron/rebuild@4.2.0` completed with no reported vulnerabilities.
+- `npx electron-rebuild -f -w better-sqlite3 -v 44.5.1` was attempted and was blocked because Visual Studio is not installed.
+- `npx electron` loaded the installed `better-sqlite3` N-API prebuild and successfully executed an in-memory SQLite query.
+- `npm run build` passed, including the compiled database runner.
+- An isolated temporary-database verification passed: first-run migration applied without creating a backup; a second pending migration created exactly one pre-migration `.sqlite` backup through the online backup API.
+- `npm run lint` passed.
+- `npx electron . --remote-debugging-port=9224` started successfully and created `C:\Users\elkon\AppData\Roaming\small_erp\database\small-shop-pos.sqlite`.
+- The live database also produced SQLite WAL sidecar files, confirming the configured WAL mode.
+- Packaged startup database creation: not verified in this step.
+- Fake sale, rollback test, printing, restore UI, licensing, and installer work remain out of scope for this step.
