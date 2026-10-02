@@ -74,3 +74,27 @@ npm run package:win:nsis
 - NSIS block map: `A:\web\SMALL_ERP\small_erp\release\Small Shop POS-Setup-0.1.0-x64.exe.blockmap`.
 - The generated executable and installer are unsigned/default-icon development artifacts; production signing and custom branding were not part of this packaging check.
 - Real Windows 10 installation and launch validation remains pending.
+
+## Electron runtime module fix — completed before Step 2
+
+### Decisions
+
+- Electron main-process and preload TypeScript compile with `module: commonjs` and `moduleResolution: node`.
+- `dist-electron/package.json` is generated with `{ "type": "commonjs" }`, overriding the root package's ESM mode.
+- The Electron entry remains `dist-electron/main.js`; its CommonJS `__dirname` resolves the preload at `dist-electron/preload.js` and the renderer at `dist/index.html`.
+- The sandboxed preload remains CommonJS and exposes the API as `window.api`.
+- BrowserWindow security settings remain unchanged: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
+- Main-process startup, window creation, renderer load failure, and renderer-process exit errors are appended to `userData/logs/main.log` and shown with `dialog.showErrorBox`.
+
+### Verification
+
+- `npm run build` passed after the CommonJS change.
+- `npm run package:win:dir` passed after the CommonJS and relative-asset fixes.
+- Development launch: `npx electron . --remote-debugging-port=9222` opened the Arabic RTL screen.
+- Development DevTools/CDP evaluation: `typeof window.api` returned `"object"`.
+- Packaged launch: `release\win-unpacked\small-shop-pos.exe --remote-debugging-port=9223` opened the Arabic RTL screen.
+- Packaged DevTools/CDP evaluation: `typeof window.api` returned `"object"`.
+- Screenshots were captured for both successful launches in the session workspace.
+- A plain `npx electron .` launch was also started successfully and remained running.
+- The plain packaged executable launch was not independently run by this tool call; the user confirmed that the packaged app worked.
+- No `userData/logs/main.log` was created during successful launches, indicating no startup or renderer failure was logged.
