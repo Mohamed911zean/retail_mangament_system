@@ -42,7 +42,8 @@
 - `npm install --save-dev electron@44.5.1` completed successfully with no reported vulnerabilities.
 - `npm run build` passed: Vite produced `dist/` and TypeScript produced `dist-electron/`.
 - `npm run lint` passed.
-- `npx electron --version` was started to verify the native Electron binary, but the Electron binary download had not completed in this environment; native launch remains unverified.
+- `npx electron --version` returned `v44.5.1`, confirming the native Electron binary is available.
+- Full GUI launch and packaged-app execution: not tested in this environment.
 - Real Windows 10 installer validation: not performed in Step 1.
 - `better-sqlite3` compatibility: not tested in Step 1; required in Step 2.
 - Printer, database, backup, license, NSIS, and portable output: not tested in Step 1.
