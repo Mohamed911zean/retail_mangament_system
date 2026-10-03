@@ -7,5 +7,8 @@ export function listAuditLog(database: DatabaseHandle, entityType?: string, enti
   return mapRows<AuditLogRow>(rows as Record<string, unknown>[])
 }
 export function insertAuditLog(database: DatabaseHandle, row: Partial<AuditLogRow>): void {
-  execute(() => database.prepare('INSERT INTO audit_log (id,occurred_at,user_id,action,entity_type,entity_id,changed_fields_json,before_json,after_json,reason,device_id,created_at) VALUES (@id,@occurred_at,@user_id,@action,@entity_type,@entity_id,@changed_fields_json,@before_json,@after_json,@reason,@device_id,@created_at)').run(row))
+  execute(() => database.prepare('INSERT INTO audit_log (id,occurred_at,user_id,action,entity_type,entity_id,changed_fields_json,before_json,after_json,reason,device_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(
+    row.id, row.occurredAt, row.userId, row.action, row.entityType, row.entityId, row.changedFieldsJson,
+    row.beforeJson, row.afterJson, row.reason, row.deviceId, row.createdAt,
+  ))
 }

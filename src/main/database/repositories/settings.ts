@@ -13,14 +13,14 @@ export function listSettings(database: DatabaseHandle): SettingRow[] {
 export function insertSetting(database: DatabaseHandle, row: Partial<SettingRow>): void {
   execute(() => database.prepare(`
     INSERT INTO settings (key,value,value_type,description,created_at,updated_at,device_id)
-    VALUES (@key,@value,@value_type,@description,@created_at,@updated_at,@device_id)
-  `).run(row))
+    VALUES (?,?,?,?,?,?,?)
+  `).run(row.key, row.value, row.valueType, row.description, row.createdAt, row.updatedAt, row.deviceId))
 }
 export function upsertSetting(database: DatabaseHandle, row: Partial<SettingRow>): void {
   execute(() => database.prepare(`
     INSERT INTO settings (key,value,value_type,description,created_at,updated_at,device_id)
-    VALUES (@key,@value,@value_type,@description,@created_at,@updated_at,@device_id)
+    VALUES (?,?,?,?,?,?,?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, value_type = excluded.value_type,
       description = excluded.description, updated_at = excluded.updated_at, device_id = excluded.device_id
-  `).run(row))
+  `).run(row.key, row.value, row.valueType, row.description, row.createdAt, row.updatedAt, row.deviceId))
 }
