@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative } from 'node:path'
 
@@ -6,6 +7,7 @@ type Migration = {
   id: string
   path: string
   sql: string
+  checksum: string
 }
 
 export type DatabasePaths = {
@@ -33,6 +35,9 @@ function migrationFiles(migrationsDirectory: string): Migration[] {
       id: fileName.replace(/\.sql$/u, ''),
       path: join(migrationsDirectory, fileName),
       sql: readFileSync(join(migrationsDirectory, fileName), 'utf8'),
+      checksum: createHash('sha256')
+        .update(readFileSync(join(migrationsDirectory, fileName), 'utf8'))
+        .digest('hex'),
     }))
     .sort((left, right) => left.id.localeCompare(right.id, 'en', { numeric: true }))
 }
@@ -72,13 +77,51 @@ function isBackupPath(context: DatabaseContext, backupPath: string): boolean {
   return relativePath !== '' && !relativePath.startsWith('..') && !relativePath.includes(':')
 }
 
-function ensureMigrationTable(database: Database.Database): void {
+function ensureMigrationTable(database: Database.Database, migrationsDirectory: string): void {
+  const table = database
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'")
+    .get()
+  if (table === undefined) {
+    database.exec(`
+      CREATE TABLE schema_migrations (
+        id TEXT PRIMARY KEY,
+        checksum TEXT NOT NULL,
+        applied_at INTEGER NOT NULL
+      ) STRICT
+    `)
+    return
+  }
+
+  const columns = database.prepare('PRAGMA table_info(schema_migrations)').all() as {
+    name: string
+  }[]
+  if (columns.some((column) => column.name === 'checksum')) {
+    return
+  }
+
   database.exec(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
+    ALTER TABLE schema_migrations RENAME TO schema_migrations_legacy;
+    CREATE TABLE schema_migrations (
       id TEXT PRIMARY KEY,
-      appliedAt INTEGER NOT NULL
-    )
+      checksum TEXT NOT NULL,
+      applied_at INTEGER NOT NULL
+    ) STRICT;
   `)
+  const legacyRows = database
+    .prepare('SELECT id, appliedAt FROM schema_migrations_legacy')
+    .all() as { id: string; appliedAt: number }[]
+  const filesById = new Map(migrationFiles(migrationsDirectory).map((migration) => [migration.id, migration.checksum]))
+  const insert = database.prepare(
+    'INSERT INTO schema_migrations (id, checksum, applied_at) VALUES (?, ?, ?)',
+  )
+  for (const row of legacyRows) {
+    const checksum = filesById.get(row.id)
+    if (checksum === undefined) {
+      throw new Error(`migration_checksum_missing:${row.id}`)
+    }
+    insert.run(row.id, checksum, row.appliedAt)
+  }
+  database.exec('DROP TABLE schema_migrations_legacy')
 }
 
 async function runMigrations(
@@ -87,7 +130,7 @@ async function runMigrations(
   backupDirectory: string,
   databaseExisted: boolean,
 ): Promise<void> {
-  ensureMigrationTable(database)
+  ensureMigrationTable(database, migrationsDirectory)
 
   const appliedMigrationIds = new Set(
     database
@@ -95,9 +138,17 @@ async function runMigrations(
       .all()
       .map((row) => String((row as { id: string }).id)),
   )
-  const pendingMigrations = migrationFiles(migrationsDirectory).filter(
-    (migration) => !appliedMigrationIds.has(migration.id),
-  )
+  const migrations = migrationFiles(migrationsDirectory)
+  const appliedRows = database
+    .prepare('SELECT id, checksum FROM schema_migrations ORDER BY id')
+    .all() as { id: string; checksum: string }[]
+  const checksums = new Map(appliedRows.map((row) => [row.id, row.checksum]))
+  for (const migration of migrations) {
+    if (appliedMigrationIds.has(migration.id) && checksums.get(migration.id) !== migration.checksum) {
+      throw new Error(`migration_checksum_mismatch:${migration.id}`)
+    }
+  }
+  const pendingMigrations = migrations.filter((migration) => !appliedMigrationIds.has(migration.id))
 
   if (pendingMigrations.length === 0) {
     return
@@ -108,13 +159,13 @@ async function runMigrations(
   }
 
   const insertMigration = database.prepare(
-    'INSERT INTO schema_migrations (id, appliedAt) VALUES (?, ?)',
+    'INSERT INTO schema_migrations (id, checksum, applied_at) VALUES (?, ?, ?)',
   )
 
   for (const migration of pendingMigrations) {
     const applyMigration = database.transaction(() => {
       database.exec(migration.sql)
-      insertMigration.run(migration.id, Date.now())
+      insertMigration.run(migration.id, migration.checksum, Date.now())
     })
     applyMigration()
   }
