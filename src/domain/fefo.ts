@@ -63,7 +63,7 @@ export function allocateFefoBatches(
 
 export function allocateCostAcrossBatches(
   totalCostPiasters: number,
-  allocations: FefoAllocation[],
+  allocations: readonly FefoAllocation[],
 ): Result<number[], DomainError> {
   const total = nonNegative(totalCostPiasters, 'totalCostPiasters')
   if (!total.ok) return total

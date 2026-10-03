@@ -19,7 +19,7 @@ function invalid(message: string, field?: string): Result<never, DomainError> {
 
 export function calculatePaymentAllocation(
   totalPiasters: number,
-  tenders: Tender[],
+  tenders: readonly Tender[],
   hasCustomer: boolean,
 ): Result<PaymentAllocation, DomainError> {
   const totalResult = safeInteger(totalPiasters, 'totalPiasters')

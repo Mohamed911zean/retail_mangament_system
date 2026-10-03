@@ -14,6 +14,10 @@ const base = {
 }
 
 describe('calculateVoidCompensation', () => {
+  function errorCode(result: ReturnType<typeof calculateVoidCompensation>): string | undefined {
+    return result.ok ? undefined : result.error.code
+  }
+
   it('compensates sale stock and money in the current shift', () => {
     expect(calculateVoidCompensation({
       ...base,
@@ -51,9 +55,9 @@ describe('calculateVoidCompensation', () => {
   })
 
   it('enforces status, returns, and shift precedence', () => {
-    expect(calculateVoidCompensation({ ...base, documentStatus: 'voided', hasCompletedReturns: true }).error?.code).toBe('document_already_voided')
-    expect(calculateVoidCompensation({ ...base, hasCompletedReturns: true }).error?.code).toBe('void_blocked_by_returns')
-    expect(calculateVoidCompensation({ ...base, currentOpenShiftId: null }).error?.code).toBe('invalid_shift_state')
+    expect(errorCode(calculateVoidCompensation({ ...base, documentStatus: 'voided', hasCompletedReturns: true }))).toBe('document_already_voided')
+    expect(errorCode(calculateVoidCompensation({ ...base, hasCompletedReturns: true }))).toBe('void_blocked_by_returns')
+    expect(errorCode(calculateVoidCompensation({ ...base, currentOpenShiftId: null }))).toBe('invalid_shift_state')
     expect(calculateVoidCompensation({ ...base, shiftsEnabled: false, currentOpenShiftId: null })).toEqual({ ok: true, value: { stockCompensations: [], moneyCompensations: [], createsNegativeStock: false } })
   })
 
@@ -78,18 +82,20 @@ describe('calculateVoidCompensation', () => {
         createsNegativeStock: false,
       },
     })
-    expect(calculateVoidCompensation({ ...input, onHandQtyByProduct: { p1: 3 } }).error?.code).toBe('insufficient_stock')
-    expect(calculateVoidCompensation({ ...input, onHandQtyByProduct: { p1: 3 }, allowNegativeStock: true }).value?.createsNegativeStock).toBe(true)
+    expect(errorCode(calculateVoidCompensation({ ...input, onHandQtyByProduct: { p1: 3 }}))).toBe('insufficient_stock')
+    const allowed = calculateVoidCompensation({ ...input, onHandQtyByProduct: { p1: 3 }, allowNegativeStock: true })
+    expect(allowed.ok && allowed.value.createsNegativeStock).toBe(true)
   })
 
   it('compensates expenses and clears shift when shifts are disabled', () => {
-    expect(calculateVoidCompensation({
+    const expense = calculateVoidCompensation({
       ...base,
       documentType: 'expense',
       shiftsEnabled: false,
       currentOpenShiftId: null,
       moneyEntries: [{ id: 'e1', entryType: 'expense', method: 'cash', direction: 'out', amountPiasters: 500 }],
-    }).value).toEqual({
+    })
+    expect(expense.ok ? expense.value : undefined).toEqual({
       stockCompensations: [],
       moneyCompensations: [{ reversesEntryId: 'e1', method: 'cash', direction: 'in', amountPiasters: 500, shiftId: null }],
       createsNegativeStock: false,

@@ -22,9 +22,9 @@ function checked(value: bigint): Result<number, DomainError> {
 }
 
 export type CustomerBalanceInput = {
-  sales: CustomerSale[]
-  receipts: CustomerReceipt[]
-  returns: CustomerReturn[]
+  sales: readonly CustomerSale[]
+  receipts: readonly CustomerReceipt[]
+  returns: readonly CustomerReturn[]
 }
 
 export type CustomerBalance = { balancePiasters: number; status: 'due' | 'credit' | 'settled' }
@@ -57,8 +57,8 @@ export function calculateCustomerBalance(
 }
 
 export type SupplierBalanceInput = {
-  purchases: SupplierPurchase[]
-  payments: SupplierPayment[]
+  purchases: readonly SupplierPurchase[]
+  payments: readonly SupplierPayment[]
 }
 
 export type SupplierBalance = { balancePiasters: number; status: 'payable' | 'credit' | 'settled' }
