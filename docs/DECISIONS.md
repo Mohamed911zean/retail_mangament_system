@@ -507,3 +507,41 @@ Revaluation rows always have `qty_delta = 0`.
 
 Batch C services must run settlement and normalization inside the same
 transaction after every stock movement.
+
+## Decision #5 - Batch B database implementation
+
+**Date:** 2026-10-04  
+**Status:** Accepted for the database layer.
+
+- Bundled SQLite is 3.53.4, above the STRICT-table minimum of 3.37.
+- The incompatible Phase 0 smoke tables are dropped by migration `0003` and
+  replaced by the frozen Phase 1 schema. This is a deliberate migration
+  compatibility boundary, not a silent table redesign.
+- The frozen schema has no stored customer or supplier balance columns.
+  `db:verify` therefore validates the ledger inputs through the pure balance
+  functions but cannot compare a derived balance to stored data.
+- The verifier uses stable codes documented in `docs/database.md`.
+- Repositories use prepared statements, typed constraint errors, one shared
+  row mapper, and a transaction handle supplied by services. They do not open
+  transactions themselves.
+- Foreign-key and aggregate lookup indexes in the migration files are
+  documented operational indexes; partial unique indexes enforce active SKU,
+  normalized barcode, one open shift per device, and one reversal per source.
+- `db:reset` is intentionally limited to `.dev-data/dev.db`; production or
+  arbitrary paths are refused.
+- Migration backups use the online backup API. `PRAGMA foreign_keys` must be
+  configured before a migration transaction because SQLite does not change it
+  inside a transaction.
+
+### Contradictions and deferred items
+
+- The schema introduction says common columns are exact for every table, while
+  append-only `audit_log` and sequence tables have their own documented
+  column sets. The implementation follows each table's explicit definition.
+- The schema document's historical “no migrations or repositories” status text
+  predates Batch B and is no longer descriptive; the database documentation is
+  the current implementation guide.
+- Stored per-product on-hand columns, stored customer balances, and stored
+  supplier balances do not exist in the frozen schema, so verification
+  recomputes them from ledgers rather than inventing columns.
+- Full repository service orchestration remains deferred to Batch C.
