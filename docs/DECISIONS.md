@@ -433,3 +433,26 @@ npm run package:win:portable
   reliable because multiple diagnostic Electron processes were already active.
 - Real weak Windows 10 hardware, physical receipt printing, and 32-bit
   Windows 10 remain unverified.
+
+## Decision #1 — Final cumulative returns and weighted valuation corrections
+
+**Date:** 2026-10-02  
+**Status:** Accepted schema correction; schema v1.0 remains frozen.
+
+The cumulative return allocation example is fixed to 1001 piasters over three
+units returned one at a time: refunds are `334`, `333`, and `334`, with
+cumulative targets `334`, `667`, and `1001`.
+
+Outgoing stock valuation uses the weighted-average rule for sales, damage,
+negative count differences, and negative adjustments. Removing all on-hand
+quantity removes exactly the on-hand value. Positive count differences and
+positive adjustments use the current weighted-average unit cost when available,
+otherwise the product default cost.
+
+Negative-stock settlement uses `costVariancePiasters =
+-revaluationPiasters`. Revaluation rows are product-level, have no batch, and
+must have zero quantity. The schema now explicitly guards these rules.
+
+Returns do not refund a sale's cash rounding adjustment; they refund only the
+persisted final line total. Voiding a purchase also reverses any revaluation it
+caused through `reverses_movement_id`.
