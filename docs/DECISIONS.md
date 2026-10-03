@@ -479,3 +479,31 @@ and report functions expose the exact Result payloads covered by their
 colocated tests. Proportional allocation uses stable input-index ties without
 a caller tie-break parameter. These contracts take precedence over earlier
 documentation wording and remain pure, integer-only domain operations.
+
+## Decision #4 — Stock ledger normalization and zero-value costing
+
+**Date:** 2026-10-03
+**Status:** Accepted for the inventory domain and upcoming services.
+
+The stock ledger maintains these invariants after every operation:
+
+- `qty == 0` implies `value == 0`.
+- `qty > 0` implies `value >= 0`.
+
+When `onHandQty > 0`, zero on-hand value is a valid zero weighted-average
+cost. Outgoing and incoming average valuation therefore use the current
+on-hand value even when it is zero; only a negative value with positive
+quantity is a `ledger_invariant_violation`.
+
+`calculateNegativeStockSettlement` is applied to every incoming movement that
+moves quantity from negative to zero or positive, including purchases,
+positive count/adjustment movements, and resalable return restocks. It receives
+that movement's own value as `incomingValue`. After every stock movement,
+including void compensations, the service applies
+`calculateStockNormalization` as the final safety net. Normalization emits a
+product-level revaluation with zero quantity: `(qty == 0 && value != 0)` or
+`(qty > 0 && value < 0)` is corrected by `-value`; all other states emit zero.
+Revaluation rows always have `qty_delta = 0`.
+
+Batch C services must run settlement and normalization inside the same
+transaction after every stock movement.
