@@ -4,9 +4,9 @@
 > happen before the domain functions are implemented, except through a
 > documented decision in `docs/DECISIONS.md`.
 
-**Status:** Phase 1 documentation only  
-**Implementation:** No migrations, repositories, services, domain code, or UI
-code are included.
+**Status:** Phase 1 schema and domain contract
+**Implementation:** No migrations, repositories, services, or UI code are
+included. Pure domain modules are implemented separately under `src/domain/`.
 
 This proposal follows `AGENTS.md` and `docs/design_system/design_system.md`:
 
@@ -988,11 +988,12 @@ settings are passed in by services.
 - **Rules:** half-up for percentage; no negative discount; cannot exceed base.
 - **Tests:** zero, fixed, percentage, 100%, over-100%, remainder, invalid input.
 
-#### `allocateProportionally(totalToAllocate, weights, tieBreakOrder)`
+#### `allocateProportionally(totalToAllocate, weights)`
 
 - **Input:** non-negative total and non-negative integer weights.
 - **Output:** integer allocations whose sum equals the total.
-- **Rules:** largest-remainder allocation; stable tie-break by line index.
+- **Rules:** largest-remainder allocation; stable tie-break by lowest input
+  index. There is no caller-supplied tie-break parameter.
 - **Tests:** zero weights, one line, equal weights, remainder, ties, total
   smaller than line count, overflow.
 
@@ -1039,19 +1040,23 @@ settings are passed in by services.
 
 ### 6.4 Payments, customer balances, and change
 
-#### `calculatePaymentAllocation(totalPiasters, tenderedPayments, customer)`
+#### `calculatePaymentAllocation(totalPiasters, tenders, hasCustomer)`
 
-- **Input:** sale total, cash/card/wallet tendered amounts, optional customer.
+- **Input:** sale total, `{ method, amountPiasters }[]` tenders, and a
+  customer-presence boolean. Repeated methods are merged in first-appearance
+  order.
 - **Output:** net ledger entries, `paid_piasters`, `due_piasters`, status,
   tendered and change snapshots.
 - **Rules:** credit is not a method; credit sale requires a customer; overpay
-  becomes change; ledger records net received. Non-cash tendered amounts may
-  not exceed `due_piasters`; only cash may exceed due, and the excess becomes
-  explicit change. Any sale with `due_piasters > 0`, including a partial
-  payment, requires a customer. The sale service enforces the customer's
-  nullable credit limit: `NULL` is unlimited, `0` blocks credit, and a
-  positive limit blocks balances above the limit unless an audited
-  manager/owner override is granted.
+  becomes change and only cash may supply it. Ledger entries contain net
+  received amounts, omit zero entries, and merge repeated methods in first
+  appearance order. Non-cash tendered amounts may not exceed the total.
+  `cashTenderedPiasters` and `changePiasters` are returned as snapshots. A
+  positive cash tender must leave a positive cash net after change. A zero
+  total accepts no tenders. The sale service enforces the customer's nullable
+  credit limit: `NULL` is unlimited, `0` blocks credit, and a positive limit
+  blocks balances above the limit unless an audited manager/owner override is
+  granted.
 - **Tests:** exact cash, change, partial credit, mixed methods, card/wallet,
   no-customer credit rejection, negative values, non-cash over-due rejection,
   overpayment.
@@ -1083,15 +1088,15 @@ settings are passed in by services.
 
 - **Input:** signed `qty_delta` and `value_delta_piasters`.
 - **Output:** `on_hand_qty`, `on_hand_value`.
-- **Rules:** simple signed sums; reject incompatible product identity.
+- **Rules:** simple signed, overflow-safe sums.
 - **Tests:** purchase/sale/return/damage/count, zero result, negative stock,
   and the sell-more-than-on-hand → purchase → sell sequence ending with both
   on-hand quantity and value exactly zero.
 
-#### `calculateNegativeStockSettlement(onHandQty, onHandValuePiasters, incomingQtyBase, incomingUnitCostPiasters, priceUnitQtyBase)`
+#### `calculateNegativeStockSettlement(onHandQty, onHandValuePiasters, incomingQty, incomingValuePiasters)`
 
-- **Input:** pre-purchase on-hand quantity/value, incoming quantity, incoming
-  cost per priced unit, and the product price-unit quantity.
+- **Input:** pre-purchase on-hand quantity/value and the incoming movement's
+  positive quantity/value.
 - **Output:** `Result<{ settledQty, settledValuePiasters, revaluationPiasters,
   costVariancePiasters }, DomainError>`.
 - **Rules:** when a purchase moves quantity from negative to zero or positive,
@@ -1100,8 +1105,8 @@ settings are passed in by services.
   zero. `costVariancePiasters = -revaluationPiasters`; positive variance is
   extra cost and reduces gross profit.
 - **Tests:** after selling 8 with 5 on hand (quantity `-3`, value `-300`),
-  purchasing 3 at 120 yields quantity `0`, value `60`, revaluation `-60`,
-  and cost variance `+60`; purchasing 3 at 80 yields value `-60`,
+  purchasing 3 at 120 yields quantity `0`, value `0`, revaluation `-60`,
+  and cost variance `+60`; purchasing 3 at 80 yields value `0`,
   revaluation `+60`, and cost variance `-60`; purchasing 10 at 120 yields
   quantity `7`, value `900`, revaluation `-60`, and final value `840`.
   Also test no-op positive stock, zero-crossing, overflow, and invalid
@@ -1130,6 +1135,18 @@ settings are passed in by services.
   cost, large intermediate product, overflow, and a count that brings quantity
   to zero while leaving value exactly `0`.
 
+#### `calculateIncomingValueAtAverage(onHandQty, onHandValuePiasters, qtyIn, defaultCostPiasters, priceUnitQtyBase)`
+
+- **Input:** current weighted-average quantity/value, incoming base quantity,
+  product default cost per priced unit, and `price_unit_qty_base`.
+- **Output:** integer incoming value for positive count differences and
+  positive adjustments.
+- **Rules:** when on-hand quantity and value are both positive, value the
+  incoming quantity at the current weighted average; otherwise use
+  `mulDivRoundHalfUp(defaultCostPiasters, qtyIn, priceUnitQtyBase)`.
+- **Tests:** positive on-hand average, empty stock fallback, negative-stock
+  fallback, invalid quantity, and overflow.
+
 #### `calculateReturnStockValue(originalCostPiasters, returnedQtyBase, originalQtyBase, alreadyReturnedQtyBase, alreadyRestockedValuePiasters)`
 
 - **Input:** original sale-line cost, current return quantity, original sale
@@ -1154,9 +1171,10 @@ settings are passed in by services.
   cumulative targets `334`, `667`, `1001`, never exceeding 1001, full return,
   duplicate/over-return, and overflow.
 
-#### `allocateFefoBatches(requestedQtyBase, batches, now)`
+#### `allocateFefoBatches(requestedQtyBase, batches, nowMs, allowExpired)`
 
-- **Input:** requested quantity, batch quantities/expiry dates, current time.
+- **Input:** requested quantity, batch quantities/expiry dates, current time,
+  and an explicit expired-batch override flag.
 - **Output:** ordered batch allocations and remaining quantity.
 - **Rules:** only enabled batch workflows call this function; earliest expiry
   first, stable receipt/ULID tie-break; expired batches are excluded unless an
@@ -1172,10 +1190,9 @@ settings are passed in by services.
 
 ### 6.6 Shifts, returns, voids, and reports
 
-#### `calculateExpectedShiftCash(openingCash, ledgerEntries)`
+#### `calculateExpectedShiftCash(openingCashPiasters, shiftId, ledgerEntries)`
 
-- **Input:** opening cash and posted money-ledger entries for the target
-  `shift_id`.
+- **Input:** opening cash, target shift id, and posted money-ledger entries.
 - **Output:** expected closing cash and breakdown.
 - **Rules:** include only cash entries whose `shift_id` equals the target
   shift; card/wallet entries and cash entries with another or null
@@ -1199,9 +1216,10 @@ settings are passed in by services.
 - **Rules:** requested return cannot exceed remaining original quantity.
 - **Tests:** partial, full, duplicate, over-return, zero/negative.
 
-#### `calculateVoidCompensation(document, currentOpenShiftId)`
+#### `calculateVoidCompensation(documentEffects)`
 
-- **Input:** immutable document effects and current open shift identity.
+- **Input:** immutable document effects, shift feature state, current open shift,
+  negative-stock policy, and product on-hand quantities.
 - **Output:** compensating stock and money-ledger entries.
 - **Rules:** compensation uses current open shift only; original snapshots are
   reused; already voided documents are rejected. A sale with completed returns
@@ -1233,7 +1251,10 @@ settings are passed in by services.
 
 - **Input:** weighted-average on-hand quantity/value rows.
 - **Output:** total integer piaster stock value and product breakdown.
-- **Rules:** use ledger value; define negative-stock reporting policy explicitly.
+- **Rules:** use ledger value only for rows with positive quantity and positive
+  value. Return those rows as the breakdown. Put products with negative
+  quantity, negative value, or zero quantity with non-zero value in
+  `needsReview`; never report negative stock value in the total.
 - **Tests:** empty, mixed products, negative value, zero quantity.
 
 ## 7. Required invariants and test strategy

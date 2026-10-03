@@ -456,3 +456,26 @@ must have zero quantity. The schema now explicitly guards these rules.
 Returns do not refund a sale's cash rounding adjustment; they refund only the
 persisted final line total. Voiding a purchase also reverses any revaluation it
 caused through `reverses_movement_id`.
+
+## Decision #2 — Cash rounding midpoint and positive minimum
+
+**Date:** 2026-10-03
+**Status:** Accepted for the domain implementation.
+
+Cash rounding uses half-up rounding to the configured piaster step. A positive
+total that rounds to zero is rounded to one full step instead; only a zero
+total may remain zero.
+
+## Decision #3 — Batch A domain contract corrections
+
+**Date:** 2026-10-03
+**Status:** Accepted for the pure domain implementation.
+
+Where the earlier schema contract used broader placeholder signatures, Batch A
+uses the concrete prompt contracts: payment allocation receives tenders and a
+customer-presence flag; negative-stock settlement receives incoming quantity
+and incoming movement value; FEFO receives `allowExpired`; return, shift, void,
+and report functions expose the exact Result payloads covered by their
+colocated tests. Proportional allocation uses stable input-index ties without
+a caller tie-break parameter. These contracts take precedence over earlier
+documentation wording and remain pure, integer-only domain operations.
