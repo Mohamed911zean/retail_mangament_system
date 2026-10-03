@@ -10,6 +10,7 @@ export type DomainErrorCode =
   | 'ledger_invariant_violation'
   | 'return_exceeds_original'
   | 'document_already_voided'
+  | 'void_blocked_by_returns'
   | 'invalid_input'
 
 export type DomainError = {
