@@ -4,6 +4,8 @@
 
 ### A. Commits
 
+- 299722c Complete repository basic operations
+- 588d675 Add Batch B review bundle
 - 7a2b93a Document Batch B database layer
 - 97e4b72 Add database repositories and transaction helpers
 - b6b8266 Add database verification
@@ -32,8 +34,6 @@
 - 2b191c7 feat: add external license generator
 - 188ab5a feat: add license foundation
 - b59972d design system files
-- 87ee56a feat: add online database backup restore
-- 993fc8b chore: remove generated source artifact
 
 ### B. Test counts per file + total
 
@@ -1746,4 +1746,163 @@ passed
 ````text
 renderer build passed; electron TypeScript build passed
 ````
+
+
+## 9. Follow-up repository completeness correction
+
+Commit 299722c Complete repository basic operations added the missing basic insert/list operations for product units, barcodes, stock batches, sale items, purchase items, sale-return items, and stock-count items. Validation after this follow-up: 
+pm test passed (31 files, 194 tests), 
+pm run lint passed, and 
+pm run build passed.
+
+### Updated repository files
+
+#### src\main\database\repositories\catalog.ts
+
+``typescript
+import { execute, mapRow, mapRows, type DatabaseHandle } from './common'
+
+export function getCategory(database: DatabaseHandle, id: string): Record<string, unknown> | undefined {
+  const row = execute(() => database.prepare('SELECT * FROM categories WHERE id = ?').get(id)) as Record<string, unknown> | undefined
+  return row === undefined ? undefined : mapRow(row)
+}
+export function insertCategory(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO categories (id,name,sort_order,deleted_at,created_at,updated_at,device_id) VALUES (@id,@name,@sort_order,@deleted_at,@created_at,@updated_at,@device_id)').run(row))
+}
+export function getProduct(database: DatabaseHandle, id: string): Record<string, unknown> | undefined {
+  const row = execute(() => database.prepare('SELECT * FROM products WHERE id = ?').get(id)) as Record<string, unknown> | undefined
+  return row === undefined ? undefined : mapRow(row)
+}
+export function listProducts(database: DatabaseHandle): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM products WHERE deleted_at IS NULL ORDER BY name').all()) as Record<string, unknown>[])
+}
+export function insertProduct(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare(`
+    INSERT INTO products (id,sku,name,category_id,base_unit_name,qty_scale,price_unit_qty_base,cost_price_piasters,
+      selling_price_piasters,tax_rate_bps,track_expiry,is_weighted,low_stock_threshold_qty,metadata,created_at,updated_at,device_id)
+    VALUES (@id,@sku,@name,@category_id,@base_unit_name,@qty_scale,@price_unit_qty_base,@cost_price_piasters,
+      @selling_price_piasters,@tax_rate_bps,@track_expiry,@is_weighted,@low_stock_threshold_qty,@metadata,@created_at,@updated_at,@device_id)
+  `).run(row))
+}
+export function insertProductUnit(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO product_units (id,product_id,unit_name,base_qty_per_unit,selling_price_piasters,deleted_at,created_at,updated_at,device_id) VALUES (@id,@product_id,@unit_name,@base_qty_per_unit,@selling_price_piasters,@deleted_at,@created_at,@updated_at,@device_id)').run(row))
+}
+export function insertBarcode(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO barcodes (id,barcode,product_id,product_unit_id,is_primary,deleted_at,created_at,updated_at,device_id) VALUES (@id,@barcode,@product_id,@product_unit_id,@is_primary,@deleted_at,@created_at,@updated_at,@device_id)').run(row))
+}
+export function listProductUnits(database: DatabaseHandle, productId: string): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM product_units WHERE product_id = ? ORDER BY unit_name').all(productId)) as Record<string, unknown>[])
+}
+export function listBarcodes(database: DatabaseHandle, productId: string): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM barcodes WHERE product_id = ? ORDER BY barcode').all(productId)) as Record<string, unknown>[])
+}
+`` 
+
+#### src\main\database\repositories\stock.ts
+
+``typescript
+import { execute, mapRow, mapRows, type DatabaseHandle } from './common'
+export function getStockMovement(database: DatabaseHandle, id: string): Record<string, unknown> | undefined {
+  const row = execute(() => database.prepare('SELECT * FROM stock_movements WHERE id = ?').get(id)) as Record<string, unknown> | undefined
+  return row === undefined ? undefined : mapRow(row)
+}
+export function insertStockBatch(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO stock_batches (id,product_id,batch_code,expiry_at,received_at,initial_qty_base,deleted_at,created_at,updated_at,device_id) VALUES (@id,@product_id,@batch_code,@expiry_at,@received_at,@initial_qty_base,@deleted_at,@created_at,@updated_at,@device_id)').run(row))
+}
+export function listStockBatches(database: DatabaseHandle, productId: string): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM stock_batches WHERE product_id = ? AND deleted_at IS NULL ORDER BY expiry_at,id').all(productId)) as Record<string, unknown>[])
+}
+export function listStockMovements(database: DatabaseHandle, productId: string): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM stock_movements WHERE product_id = ? ORDER BY occurred_at,id').all(productId)) as Record<string, unknown>[])
+}
+export function getOnHand(database: DatabaseHandle, productId: string): { qty: number; valuePiasters: number } {
+  return execute(() => database.prepare('SELECT COALESCE(SUM(qty_delta),0) AS qty, COALESCE(SUM(value_delta_piasters),0) AS valuePiasters FROM stock_movements WHERE product_id = ?').get(productId)) as { qty: number; valuePiasters: number }
+}
+export function insertStockMovement(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO stock_movements (id,product_id,batch_id,qty_delta,value_delta_piasters,movement_type,reverses_movement_id,reference_type,reference_id,occurred_at,reason,created_by_user_id,created_at,updated_at,device_id) VALUES (@id,@product_id,@batch_id,@qty_delta,@value_delta_piasters,@movement_type,@reverses_movement_id,@reference_type,@reference_id,@occurred_at,@reason,@created_by_user_id,@created_at,@updated_at,@device_id)').run(row))
+}
+`` 
+
+#### src\main\database\repositories\sales.ts
+
+``typescript
+import { execute, mapRow, mapRows, type DatabaseHandle } from './common'
+export function getSale(database: DatabaseHandle, id: string): Record<string, unknown> | undefined {
+  const row = execute(() => database.prepare('SELECT * FROM sales WHERE id = ?').get(id)) as Record<string, unknown> | undefined
+  return row === undefined ? undefined : mapRow(row)
+}
+export function listSales(database: DatabaseHandle): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM sales ORDER BY created_at,id').all()) as Record<string, unknown>[])
+}
+export function insertSale(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO sales (id,invoice_number,customer_id,user_id,shift_id,subtotal_piasters,line_discount_piasters,invoice_discount_piasters,tax_piasters,rounding_adjustment_piasters,total_piasters,paid_piasters,due_piasters,payment_status,status,created_at,updated_at,device_id) VALUES (@id,@invoice_number,@customer_id,@user_id,@shift_id,@subtotal_piasters,@line_discount_piasters,@invoice_discount_piasters,@tax_piasters,@rounding_adjustment_piasters,@total_piasters,@paid_piasters,@due_piasters,@payment_status,@status,@created_at,@updated_at,@device_id)').run(row))
+}
+export function listSaleItems(database: DatabaseHandle, saleId: string): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM sale_items WHERE sale_id = ? ORDER BY id').all(saleId)) as Record<string, unknown>[])
+}
+export function insertSaleItem(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO sale_items (id,sale_id,product_id,unit_name_snapshot,priced_unit_qty_base,qty_base,unit_price_piasters,line_subtotal_piasters,line_discount_piasters,invoice_discount_allocated_piasters,tax_rate_bps_snapshot,tax_piasters,final_line_total_piasters,line_cost_piasters,product_name_snapshot,created_at,updated_at,device_id) VALUES (@id,@sale_id,@product_id,@unit_name_snapshot,@priced_unit_qty_base,@qty_base,@unit_price_piasters,@line_subtotal_piasters,@line_discount_piasters,@invoice_discount_allocated_piasters,@tax_rate_bps_snapshot,@tax_piasters,@final_line_total_piasters,@line_cost_piasters,@product_name_snapshot,@created_at,@updated_at,@device_id)').run(row))
+}
+`` 
+
+#### src\main\database\repositories\purchases.ts
+
+``typescript
+import { execute, mapRows, type DatabaseHandle } from './common'
+export function listPurchases(database: DatabaseHandle, supplierId?: string): Record<string, unknown>[] {
+  const rows = supplierId === undefined
+    ? execute(() => database.prepare('SELECT * FROM purchases ORDER BY created_at,id').all())
+    : execute(() => database.prepare('SELECT * FROM purchases WHERE supplier_id = ? ORDER BY created_at,id').all(supplierId))
+  return mapRows(rows as Record<string, unknown>[])
+}
+export function insertPurchase(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO purchases (id,purchase_number,supplier_id,user_id,total_piasters,paid_piasters,due_piasters,payment_status,status,created_at,updated_at,device_id) VALUES (@id,@purchase_number,@supplier_id,@user_id,@total_piasters,@paid_piasters,@due_piasters,@payment_status,@status,@created_at,@updated_at,@device_id)').run(row))
+}
+export function listPurchaseItems(database: DatabaseHandle, purchaseId: string): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM purchase_items WHERE purchase_id = ? ORDER BY id').all(purchaseId)) as Record<string, unknown>[])
+}
+export function insertPurchaseItem(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO purchase_items (id,purchase_id,product_id,unit_name_snapshot,priced_unit_qty_base,qty_base,unit_cost_piasters,line_subtotal_piasters,tax_rate_bps_snapshot,tax_piasters,line_total_piasters,batch_code_snapshot,expiry_at_snapshot,created_at,updated_at,device_id) VALUES (@id,@purchase_id,@product_id,@unit_name_snapshot,@priced_unit_qty_base,@qty_base,@unit_cost_piasters,@line_subtotal_piasters,@tax_rate_bps_snapshot,@tax_piasters,@line_total_piasters,@batch_code_snapshot,@expiry_at_snapshot,@created_at,@updated_at,@device_id)').run(row))
+}
+`` 
+
+#### src\main\database\repositories\sale-returns.ts
+
+``typescript
+import { execute, mapRows, type DatabaseHandle } from './common'
+export function listSaleReturns(database: DatabaseHandle, customerId?: string): Record<string, unknown>[] {
+  const rows = customerId === undefined
+    ? execute(() => database.prepare('SELECT * FROM sale_returns ORDER BY created_at,id').all())
+    : execute(() => database.prepare('SELECT * FROM sale_returns WHERE customer_id = ? ORDER BY created_at,id').all(customerId))
+  return mapRows(rows as Record<string, unknown>[])
+}
+export function insertSaleReturn(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO sale_returns (id,return_number,original_sale_id,customer_id,user_id,shift_id,total_piasters,cash_refunded_piasters,credited_to_account_piasters,status,created_at,updated_at,device_id) VALUES (@id,@return_number,@original_sale_id,@customer_id,@user_id,@shift_id,@total_piasters,@cash_refunded_piasters,@credited_to_account_piasters,@status,@created_at,@updated_at,@device_id)').run(row))
+}
+export function listSaleReturnItems(database: DatabaseHandle, saleReturnId: string): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM sale_return_items WHERE sale_return_id = ? ORDER BY id').all(saleReturnId)) as Record<string, unknown>[])
+}
+export function insertSaleReturnItem(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO sale_return_items (id,sale_return_id,sale_item_id,product_id,qty_base,refund_piasters,condition,created_at,updated_at,device_id) VALUES (@id,@sale_return_id,@sale_item_id,@product_id,@qty_base,@refund_piasters,@condition,@created_at,@updated_at,@device_id)').run(row))
+}
+`` 
+
+#### src\main\database\repositories\stock-counts.ts
+
+``typescript
+import { execute, mapRows, type DatabaseHandle } from './common'
+export function listStockCounts(database: DatabaseHandle): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM stock_counts ORDER BY started_at,id').all()) as Record<string, unknown>[])
+}
+export function insertStockCount(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO stock_counts (id,status,started_at,posted_at,user_id,notes,created_at,updated_at,device_id) VALUES (@id,@status,@started_at,@posted_at,@user_id,@notes,@created_at,@updated_at,@device_id)').run(row))
+}
+export function listStockCountItems(database: DatabaseHandle, stockCountId: string): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM stock_count_items WHERE stock_count_id = ? ORDER BY id').all(stockCountId)) as Record<string, unknown>[])
+}
+export function insertStockCountItem(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO stock_count_items (id,stock_count_id,product_id,expected_qty_base,counted_qty_base,difference_qty_base,created_at,updated_at,device_id) VALUES (@id,@stock_count_id,@product_id,@expected_qty_base,@counted_qty_base,@difference_qty_base,@created_at,@updated_at,@device_id)').run(row))
+}
+`` 
+
 
