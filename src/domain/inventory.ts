@@ -66,7 +66,15 @@ export function calculateOutgoingCost(
     return err({ code: 'invalid_quantity', message: 'priceUnitQtyBase must be positive', field: 'priceUnitQtyBase' })
   }
 
-  if (qtyResult.value > 0 && valueResult.value > 0) {
+  if (qtyResult.value > 0 && valueResult.value < 0) {
+    return err({
+      code: 'ledger_invariant_violation',
+      message: 'positive on-hand quantity cannot have negative value',
+      field: 'onHandValue',
+    })
+  }
+
+  if (qtyResult.value > 0) {
     if (outResult.value === qtyResult.value) return ok(valueResult.value)
     if (outResult.value < qtyResult.value) {
       return mulDivRoundHalfUp(valueResult.value, outResult.value, qtyResult.value)
@@ -99,10 +107,36 @@ export function calculateIncomingValueAtAverage(
   if (!costResult.ok) return costResult
   const unitResult = nonNegative(priceUnitQtyBase, 'priceUnitQtyBase')
   if (!unitResult.ok || unitResult.value === 0) return err({ code: 'invalid_quantity', message: 'priceUnitQtyBase must be positive', field: 'priceUnitQtyBase' })
-  if (qtyResult.value > 0 && valueResult.value > 0) {
+  if (qtyResult.value > 0 && valueResult.value < 0) {
+    return err({
+      code: 'ledger_invariant_violation',
+      message: 'positive on-hand quantity cannot have negative value',
+      field: 'onHandValue',
+    })
+  }
+
+  if (qtyResult.value > 0) {
     return mulDivRoundHalfUp(valueResult.value, inResult.value, qtyResult.value)
   }
   return mulDivRoundHalfUp(costResult.value, inResult.value, unitResult.value)
+}
+
+export function calculateStockNormalization(
+  qty: number,
+  value: number,
+): Result<{ revaluationPiasters: number }, DomainError> {
+  const qtyResult = integer(qty, 'qty')
+  if (!qtyResult.ok) return qtyResult
+  const valueResult = integer(value, 'value')
+  if (!valueResult.ok) return valueResult
+
+  if (
+    (qtyResult.value === 0 && valueResult.value !== 0) ||
+    (qtyResult.value > 0 && valueResult.value < 0)
+  ) {
+    return ok({ revaluationPiasters: -valueResult.value })
+  }
+  return ok({ revaluationPiasters: 0 })
 }
 
 export type NegativeStockSettlement = {
