@@ -3,6 +3,12 @@ export function getStockMovement(database: DatabaseHandle, id: string): Record<s
   const row = execute(() => database.prepare('SELECT * FROM stock_movements WHERE id = ?').get(id)) as Record<string, unknown> | undefined
   return row === undefined ? undefined : mapRow(row)
 }
+export function insertStockBatch(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO stock_batches (id,product_id,batch_code,expiry_at,received_at,initial_qty_base,deleted_at,created_at,updated_at,device_id) VALUES (@id,@product_id,@batch_code,@expiry_at,@received_at,@initial_qty_base,@deleted_at,@created_at,@updated_at,@device_id)').run(row))
+}
+export function listStockBatches(database: DatabaseHandle, productId: string): Record<string, unknown>[] {
+  return mapRows(execute(() => database.prepare('SELECT * FROM stock_batches WHERE product_id = ? AND deleted_at IS NULL ORDER BY expiry_at,id').all(productId)) as Record<string, unknown>[])
+}
 export function listStockMovements(database: DatabaseHandle, productId: string): Record<string, unknown>[] {
   return mapRows(execute(() => database.prepare('SELECT * FROM stock_movements WHERE product_id = ? ORDER BY occurred_at,id').all(productId)) as Record<string, unknown>[])
 }

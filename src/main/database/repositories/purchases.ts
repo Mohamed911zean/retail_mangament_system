@@ -11,3 +11,6 @@ export function insertPurchase(database: DatabaseHandle, row: Record<string, unk
 export function listPurchaseItems(database: DatabaseHandle, purchaseId: string): Record<string, unknown>[] {
   return mapRows(execute(() => database.prepare('SELECT * FROM purchase_items WHERE purchase_id = ? ORDER BY id').all(purchaseId)) as Record<string, unknown>[])
 }
+export function insertPurchaseItem(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO purchase_items (id,purchase_id,product_id,unit_name_snapshot,priced_unit_qty_base,qty_base,unit_cost_piasters,line_subtotal_piasters,tax_rate_bps_snapshot,tax_piasters,line_total_piasters,batch_code_snapshot,expiry_at_snapshot,created_at,updated_at,device_id) VALUES (@id,@purchase_id,@product_id,@unit_name_snapshot,@priced_unit_qty_base,@qty_base,@unit_cost_piasters,@line_subtotal_piasters,@tax_rate_bps_snapshot,@tax_piasters,@line_total_piasters,@batch_code_snapshot,@expiry_at_snapshot,@created_at,@updated_at,@device_id)').run(row))
+}

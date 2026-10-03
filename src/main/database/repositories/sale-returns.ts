@@ -11,3 +11,6 @@ export function insertSaleReturn(database: DatabaseHandle, row: Record<string, u
 export function listSaleReturnItems(database: DatabaseHandle, saleReturnId: string): Record<string, unknown>[] {
   return mapRows(execute(() => database.prepare('SELECT * FROM sale_return_items WHERE sale_return_id = ? ORDER BY id').all(saleReturnId)) as Record<string, unknown>[])
 }
+export function insertSaleReturnItem(database: DatabaseHandle, row: Record<string, unknown>): void {
+  execute(() => database.prepare('INSERT INTO sale_return_items (id,sale_return_id,sale_item_id,product_id,qty_base,refund_piasters,condition,created_at,updated_at,device_id) VALUES (@id,@sale_return_id,@sale_item_id,@product_id,@qty_base,@refund_piasters,@condition,@created_at,@updated_at,@device_id)').run(row))
+}
