@@ -145,7 +145,8 @@ describe('inventory valuation', () => {
       const purchases: { qtyDelta: number; valueDeltaPiasters: number; voided: boolean }[] = []
       const revaluationRows: { qtyDelta: number; valueDeltaPiasters: number }[] = []
 
-      for (let operation = 0; operation < next(36) + 5; operation += 1) {
+      const sequenceLength = next(36) + 5
+      for (let operation = 0; operation < sequenceLength; operation += 1) {
         const kind = next(7)
         if (kind === 0 || kind === 3 || kind === 5) {
           const incomingQty = next(20) + 1
@@ -210,5 +211,5 @@ describe('inventory valuation', () => {
         if (qty > 0) expect(value).toBeGreaterThanOrEqual(0)
       }
     }
-  })
+  }, 20000)
 })

@@ -67,6 +67,7 @@ the stock invariants, recomputes customer/supplier balance inputs using the
 domain functions, checks shift cash using `calculateExpectedShiftCash`,
 checks sale totals and paid/due, validates reversal links and opposite signs,
 checks required triggers, and runs `foreign_key_check` and `integrity_check`.
+Each error also exposes the Arabic translation key `errors.<code>`.
 
 Verifier codes are:
 
@@ -82,8 +83,15 @@ Verifier codes are:
 | `reversal_sign` | reversal does not invert its original |
 | `missing_append_only_trigger` | required immutability trigger is absent |
 | `shift_cash_mismatch` | stored expected shift cash differs from ledger math |
+| `document_ledger_mismatch` | document payment ledger does not match stored paid amount |
+| `document_stock_mismatch` | document item quantities/cost do not match stock movements |
+| `return_total_mismatch` | return item refunds do not match return total |
+| `return_refund_mismatch` | return refund ledger does not match cash refunded |
+| `return_restock_mismatch` | resalable/damaged return movement rule is violated |
+| `missing_void_compensation` | voided state does not match compensation rows |
+| `reversal_metadata_mismatch` | reversal metadata does not match its original |
+| `balance_mismatch` | derived balance is invalid or outside safe integer range |
 
 The frozen schema stores customer and supplier balances as derived values, not
 columns. The verifier therefore validates that their ledger inputs are
 accepted by the pure balance functions; there is no stored balance to compare.
-

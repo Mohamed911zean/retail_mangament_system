@@ -508,6 +508,33 @@ Revaluation rows always have `qty_delta = 0`.
 Batch C services must run settlement and normalization inside the same
 transaction after every stock movement.
 
+## Decision #6 - Batch C0 hardening
+
+**Date:** 2026-10-03  
+**Status:** Accepted for the database boundary.
+
+- Migration `0008_phase1c_hardening.sql` adds only triggers and indexes; no
+  applied migration is edited and no table is rebuilt.
+- Void state is final. A void transition requires timestamp, actor, and
+  reason metadata. Expenses and stock counts use guarded updates; posted or
+  voided count items are immutable.
+- Payment-status consistency is enforced at insert time for sales and
+  purchases.
+- Repositories remain synchronous because `better-sqlite3` is synchronous;
+  services will expose async methods and perform one synchronous transaction
+  internally. `runInTransaction` rejects thenables immediately.
+- Sequence allocation receives an injected `now` value; repositories do not
+  read the system clock.
+- New indexes: `sales.user_id`, `sales.created_at`, `money_ledger.sale_id`,
+  `money_ledger.occurred_at`, `shifts.user_id`, `held_sales.shift_id`,
+  `held_sales.customer_id`, `stock_movements(reference_type,reference_id)`,
+  and `stock_movements.occurred_at`. These support actor, document,
+  reconciliation, shift, held-cart, and chronological ledger lookups.
+- Verifier messages expose stable `messageKey` values under `errors.<code>`.
+  Customer and supplier balances remain derived because the frozen schema has
+  no stored balance columns; `getBalances()` returns domain-calculated,
+  safe-integer snapshots.
+
 ## Decision #5 - Batch B database implementation
 
 **Date:** 2026-10-04  

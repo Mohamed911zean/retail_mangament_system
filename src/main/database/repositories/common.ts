@@ -37,7 +37,13 @@ export function execute<T>(operation: () => T): T {
 }
 
 export function runInTransaction<T>(database: DatabaseHandle, work: (transaction: DatabaseHandle) => T): T {
-  const transaction = database.transaction(() => work(database))
+  const transaction = database.transaction(() => {
+    const result = work(database)
+    if (result !== null && (typeof result === 'object' || typeof result === 'function') && 'then' in result) {
+      throw new TypeError('runInTransaction does not accept asynchronous callbacks')
+    }
+    return result
+  })
   return transaction()
 }
 
@@ -47,7 +53,7 @@ function camelCase(key: string): string {
   return key.replace(/_([a-z])/gu, (_, letter: string) => letter.toUpperCase())
 }
 
-export function mapRow<T extends Record<string, unknown>>(row: Record<string, unknown>): T {
+export function mapRow<T>(row: Record<string, unknown>): T {
   return Object.fromEntries(
     Object.entries(row).map(([key, value]) => [
       camelCase(key),
@@ -56,11 +62,11 @@ export function mapRow<T extends Record<string, unknown>>(row: Record<string, un
   ) as T
 }
 
-export function mapRows<T extends Record<string, unknown>>(rows: Record<string, unknown>[]): T[] {
+export function mapRows<T>(rows: Record<string, unknown>[]): T[] {
   return rows.map((row) => mapRow<T>(row))
 }
 
-export function insertAndMap<T extends Record<string, unknown>>(
+export function insertAndMap<T>(
   database: DatabaseHandle,
   sql: string,
   parameters: unknown[],

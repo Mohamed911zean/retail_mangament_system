@@ -1,7 +1,6 @@
 import { execute, type DatabaseHandle } from './common'
-export function nextSequenceNumber(database: DatabaseHandle, deviceId: string, sequenceName: 'sale_invoice' | 'purchase' | 'sale_return'): number {
+export function nextSequenceNumber(database: DatabaseHandle, deviceId: string, sequenceName: 'sale_invoice' | 'purchase' | 'sale_return', now: number): number {
   return execute(() => {
-    const now = Date.now()
     database.prepare(`
       INSERT INTO device_sequences (device_id,sequence_name,next_value,updated_at)
       VALUES (?, ?, 2, ?)

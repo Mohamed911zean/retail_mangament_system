@@ -13,8 +13,8 @@ function seed(database: Database.Database): void {
     VALUES ('u1','u1','User','hash','owner',1,${now},${now},'d1');
     INSERT INTO products (id,name,base_unit_name,qty_scale,price_unit_qty_base,cost_price_piasters,selling_price_piasters,track_expiry,is_weighted,created_at,updated_at,device_id)
     VALUES ('p1','Product','piece',0,1,100,100,0,0,${now},${now},'d1');
-    INSERT INTO shifts (id,user_id,opened_at,opening_cash_piasters,expected_cash_piasters,status,created_at,updated_at,device_id)
-    VALUES ('sh1','u1',${now},0,0,'open',${now},${now},'d1');
+    INSERT INTO shifts (id,user_id,opened_at,closed_at,opening_cash_piasters,expected_cash_piasters,counted_cash_piasters,difference_piasters,status,created_at,updated_at,device_id)
+    VALUES ('sh1','u1',${now},${now},0,0,0,0,'closed',${now},${now},'d1');
     INSERT INTO stock_movements (id,product_id,qty_delta,value_delta_piasters,movement_type,occurred_at,created_by_user_id,created_at,updated_at,device_id)
     VALUES ('m1','p1',1,100,'purchase',${now},'u1',${now},${now},'d1');
   `)

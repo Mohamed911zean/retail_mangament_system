@@ -75,8 +75,11 @@ describe('database repositories', () => {
     insertSaleReturn(context.database, { id: 'ret1', return_number: '1', original_sale_id: 'sale1', customer_id: null, user_id: 'u1', shift_id: 'sh1', total_piasters: 0, cash_refunded_piasters: 0, credited_to_account_piasters: 0, status: 'completed', ...common })
     insertStockCount(context.database, { id: 'count1', status: 'draft', started_at: now, posted_at: null, user_id: 'u1', notes: null, ...common })
     insertExpense(context.database, { id: 'exp1', category: 'misc', description: 'Test', amount_piasters: 1, payment_method: 'cash', expense_at: now, user_id: 'u1', shift_id: 'sh1', status: 'posted', ...common })
-    expect(nextSequenceNumber(context.database, 'd1', 'sale_invoice')).toBe(1)
-    expect(nextSequenceNumber(context.database, 'd1', 'sale_invoice')).toBe(2)
+    expect(nextSequenceNumber(context.database, 'd1', 'sale_invoice', now)).toBe(1)
+    expect(nextSequenceNumber(context.database, 'd1', 'sale_invoice', now + 1)).toBe(2)
+    expect(() => runInTransaction(context.database, () => Promise.resolve())).toThrow(
+      'runInTransaction does not accept asynchronous callbacks',
+    )
     closeDatabase(context)
     rmSync(root, { recursive: true, force: true })
   })
