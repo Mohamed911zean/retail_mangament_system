@@ -47,7 +47,30 @@ describe('Phase 1 migrations', () => {
     closeDatabase(first)
 
     const second = await openDatabase(userData, join(process.cwd(), 'migrations'))
-    expect(second.database.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get()).toEqual({ count: 6 })
+    expect(second.database.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get()).toEqual({ count: 7 })
+    const triggers = second.database
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name")
+      .all() as { name: string }[]
+    expect(triggers.map((trigger) => trigger.name)).toEqual([
+      'trg_audit_log_no_delete',
+      'trg_audit_log_no_update',
+      'trg_money_ledger_no_delete',
+      'trg_money_ledger_no_update',
+      'trg_purchase_items_no_delete',
+      'trg_purchase_items_no_update',
+      'trg_purchases_guarded_update',
+      'trg_purchases_no_delete',
+      'trg_sale_items_no_delete',
+      'trg_sale_items_no_update',
+      'trg_sale_return_items_no_delete',
+      'trg_sale_return_items_no_update',
+      'trg_sale_returns_guarded_update',
+      'trg_sale_returns_no_delete',
+      'trg_sales_guarded_update',
+      'trg_sales_no_delete',
+      'trg_stock_movements_no_delete',
+      'trg_stock_movements_no_update',
+    ])
     closeDatabase(second)
     rmSync(root, { recursive: true, force: true })
   })
