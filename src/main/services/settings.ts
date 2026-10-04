@@ -89,4 +89,24 @@ export class SettingsService {
   async applyFrozenFoodPreset(actor: Actor): Promise<ServiceResult<Settings>> {
     return this.set(actor, 'expiry_batches', true)
   }
+
+  async applyGroceryPreset(actor: Actor): Promise<ServiceResult<Settings>> {
+    if (actor.role === 'cashier') return serviceErr('permission_denied')
+    const r1 = await this.set(actor, 'expiry_batches', false)
+    if (!r1.ok) return r1
+    const r2 = await this.set(actor, 'weighted_items', true)
+    if (!r2.ok) return r2
+    const r3 = await this.set(actor, 'customer_credit', true)
+    if (!r3.ok) return r3
+    return this.set(actor, 'allow_negative_stock', false)
+  }
+
+  async applySweetsPreset(actor: Actor): Promise<ServiceResult<Settings>> {
+    if (actor.role === 'cashier') return serviceErr('permission_denied')
+    const r1 = await this.set(actor, 'weighted_items', true)
+    if (!r1.ok) return r1
+    const r2 = await this.set(actor, 'expiry_batches', false)
+    if (!r2.ok) return r2
+    return this.set(actor, 'cash_rounding_step_piasters', 25)
+  }
 }

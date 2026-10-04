@@ -19,6 +19,8 @@ dist-ssr
 # Local signing material is never shipped.
 private/
 issued-licenses.csv
+installed-launch.stdout.log
+installed-launch.stderr.log
 
 # Editor directories and files
 .vscode/*
@@ -34,3 +36,5 @@ issued-licenses.csv
 
 .diag-asar
 .verify-fixed-asar
+
+.dev-data
