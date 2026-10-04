@@ -63,6 +63,7 @@ export class SaleReturnService {
       // Build cumulative already-returned qty/value per sale item
       const alreadyReturnedQty: Record<string, number> = {}
       const alreadyReturnedValue: Record<string, number> = {}
+      const alreadyReturnedResalableQty: Record<string, number> = {}
       const alreadyReturnedCost: Record<string, number> = {}
       for (const ret of previousReturns) {
         if (ret.status === 'voided') continue
@@ -71,7 +72,12 @@ export class SaleReturnService {
           alreadyReturnedQty[ri.saleItemId] = (alreadyReturnedQty[ri.saleItemId] ?? 0) + ri.qtyBase
           alreadyReturnedValue[ri.saleItemId] = (alreadyReturnedValue[ri.saleItemId] ?? 0) + ri.refundPiasters
           if (ri.condition === 'resalable') {
-            alreadyReturnedCost[ri.saleItemId] = (alreadyReturnedCost[ri.saleItemId] ?? 0) + ri.refundPiasters
+            alreadyReturnedResalableQty[ri.saleItemId] = (alreadyReturnedResalableQty[ri.saleItemId] ?? 0) + ri.qtyBase
+            const orig = originalItems.find((oi) => oi.id === ri.saleItemId)
+            if (orig) {
+              const resCost = calculateReturnStockValue(orig.lineCostPiasters, alreadyReturnedResalableQty[ri.saleItemId], orig.qtyBase, 0, 0)
+              if (resCost.ok) alreadyReturnedCost[ri.saleItemId] = resCost.value
+            }
           }
         }
       }
@@ -98,7 +104,7 @@ export class SaleReturnService {
             originalItem.lineCostPiasters,
             line.qtyBase,
             originalItem.qtyBase,
-            alreadyReturnedQty[line.saleItemId] ?? 0,
+            alreadyReturnedResalableQty[line.saleItemId] ?? 0,
             alreadyReturnedCost[line.saleItemId] ?? 0,
           )
           if (!stockValResult.ok) return serviceErr(stockValResult.error.code, stockValResult.error)
@@ -160,7 +166,7 @@ export class SaleReturnService {
               valuePiasters: ld.stockValuePiasters,
               movementType: 'sale_return',
               referenceType: 'sale_return',
-              referenceId: returnId,
+              referenceId: itemId,
               userId: actor.userId,
               deviceId: this.deps.deviceId,
             })
