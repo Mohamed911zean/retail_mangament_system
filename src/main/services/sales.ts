@@ -17,7 +17,7 @@ import type { FaultInjector } from './fault-injector'
 import { noFaults } from './fault-injector'
 import type { IdGenerator } from './ids'
 import { createUlidGenerator } from './ids'
-import type { Actor } from './permissions'
+import { assertPermission, type Actor } from './permissions'
 import { serviceErr, serviceOk, type ServiceResult, ServiceTransactionError } from './result'
 import { writeAudit } from './audit'
 
@@ -77,6 +77,10 @@ export class SaleService {
       // Build line inputs for domain calculation
       const lineInputs: (LineInput & { productId: string; pricedUnitQtyBase: number; qtyBase: number; unitPricePiasters: number; batchId: string | null; unitNameSnapshot: string; productNameSnapshot: string })[] = []
       for (const line of input.lines) {
+        if (line.unitPricePiasters === 0) {
+          const perm = assertPermission(actor, 'sale.zero_price')
+          if (!perm.ok) return perm
+        }
         const product = getProduct(this.deps.database, line.productId)
         if (product === undefined) return serviceErr('not_found', { productId: line.productId })
         lineInputs.push({
