@@ -13,7 +13,7 @@ import { noFaults } from './fault-injector'
 import type { IdGenerator } from './ids'
 import { createUlidGenerator } from './ids'
 import type { Actor } from './permissions'
-import { serviceErr, serviceOk, type ServiceResult } from './result'
+import { serviceErr, serviceOk, type ServiceResult, ServiceTransactionError } from './result'
 import { writeAudit } from './audit'
 
 export type ReturnLineInput = {
@@ -116,8 +116,6 @@ export class SaleReturnService {
       const returnNumber = String(nextSequenceNumber(this.deps.database, this.deps.deviceId, 'sale_return', now))
       this.faults.after('sale_return.sequence_allocated')
 
-      let resultRef!: ServiceResult<SaleReturnResult>
-
       runInTransaction(this.deps.database, (tx) => {
         insertSaleReturn(tx, {
           id: returnId,
@@ -167,8 +165,7 @@ export class SaleReturnService {
               deviceId: this.deps.deviceId,
             })
             if (!stockResult.ok) {
-              resultRef = serviceErr(stockResult.error.code, stockResult.error)
-              throw new Error('stock_error')
+              throw new ServiceTransactionError(serviceErr(stockResult.error.code, stockResult.error))
             }
             this.faults.after(`sale_return.item.${i}.stock_applied`)
           }
@@ -194,27 +191,6 @@ export class SaleReturnService {
             deviceId: this.deps.deviceId,
           })
         }
-
-        // Credit to account money ledger entry
-        if (creditedToAccount > 0 && originalSale.customerId) {
-          insertMoneyLedgerEntry(tx, {
-            id: this.ids.next(),
-            entryType: 'sale_return_credit',
-            direction: 'in',
-            amountPiasters: creditedToAccount,
-            paymentMethod: 'credit',
-            customerId: originalSale.customerId,
-            saleId: input.originalSaleId,
-            referenceType: 'sale_return',
-            referenceId: returnId,
-            shiftId: input.shiftId ?? null,
-            occurredAt: now,
-            userId: actor.userId,
-            createdAt: now,
-            updatedAt: now,
-            deviceId: this.deps.deviceId,
-          })
-        }
         this.faults.after('sale_return.money_inserted')
 
         writeAudit(tx, this.ids, {
@@ -225,14 +201,12 @@ export class SaleReturnService {
         this.faults.after('sale_return.audited')
       })
 
-      if (resultRef !== undefined && !resultRef.ok) return resultRef
-
       const saleReturn = getSaleReturn(this.deps.database, returnId)
       const items = listSaleReturnItems(this.deps.database, returnId)
       if (saleReturn === undefined) return serviceErr('database_error')
       return serviceOk({ saleReturn, items })
     } catch (e: unknown) {
-      if (e instanceof Error && e.message === 'stock_error') return resultRef
+      if (e instanceof ServiceTransactionError) return e.result
       return serviceErr('database_error', e)
     }
   }

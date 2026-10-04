@@ -18,7 +18,7 @@ import { noFaults } from './fault-injector'
 import type { IdGenerator } from './ids'
 import { createUlidGenerator } from './ids'
 import type { Actor } from './permissions'
-import { serviceErr, serviceOk, type ServiceResult } from './result'
+import { serviceErr, serviceOk, type ServiceResult, ServiceTransactionError } from './result'
 import { writeAudit } from './audit'
 
 export type SaleLineInput = {
@@ -110,8 +110,6 @@ export class SaleService {
       const invoiceNumber = String(nextSequenceNumber(this.deps.database, this.deps.deviceId, 'sale_invoice', now))
       this.faults.after('sale.sequence_allocated')
 
-      let saleResult!: ServiceResult<SaleResult>
-
       runInTransaction(this.deps.database, (tx) => {
         // Insert the sale header
         insertSale(tx, {
@@ -155,8 +153,7 @@ export class SaleService {
             deviceId: this.deps.deviceId,
           })
           if (!stockResult.ok) {
-            saleResult = serviceErr(stockResult.error.code, stockResult.error)
-            throw new Error('stock_error')
+            throw new ServiceTransactionError(serviceErr(stockResult.error.code, stockResult.error))
           }
           this.faults.after(`sale.item.${i}.stock_applied`)
 
@@ -208,27 +205,6 @@ export class SaleService {
           })
           this.faults.after(`sale.ledger.${entry.method}_inserted`)
         }
-
-        // Credit balance entry for unpaid amount
-        if (paymentResult.value.duePiasters > 0 && input.customerId) {
-          insertMoneyLedgerEntry(tx, {
-            id: this.ids.next(),
-            entryType: 'sale_credit',
-            direction: 'out',
-            amountPiasters: paymentResult.value.duePiasters,
-            paymentMethod: 'credit',
-            customerId: input.customerId,
-            saleId,
-            referenceType: 'sale',
-            referenceId: saleId,
-            shiftId: input.shiftId ?? null,
-            occurredAt: now,
-            userId: actor.userId,
-            createdAt: now,
-            updatedAt: now,
-            deviceId: this.deps.deviceId,
-          })
-        }
         this.faults.after('sale.money_inserted')
 
         writeAudit(tx, this.ids, {
@@ -239,14 +215,12 @@ export class SaleService {
         this.faults.after('sale.audited')
       })
 
-      if (saleResult !== undefined && !saleResult.ok) return saleResult
-
       const sale = getSale(this.deps.database, saleId)
       const items = listSaleItems(this.deps.database, saleId)
       if (sale === undefined) return serviceErr('database_error')
       return serviceOk({ sale, items })
     } catch (e: unknown) {
-      if (e instanceof Error && e.message === 'stock_error') return saleResult
+      if (e instanceof ServiceTransactionError) return e.result
       return serviceErr('database_error', e)
     }
   }

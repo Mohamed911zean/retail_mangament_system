@@ -1,3 +1,6 @@
+
+
+
 import type { DatabaseHandle } from '../database/repositories/common'
 import { runInTransaction } from '../database/repositories/common'
 import { insertPurchase, insertPurchaseItem, getPurchase, listPurchaseItems } from '../database/repositories/purchases'
@@ -8,6 +11,8 @@ import { nextSequenceNumber } from '../database/repositories/sequences'
 import { getProduct } from '../database/repositories/catalog'
 import type { PurchaseRow, PurchaseItemRow, SupplierRow } from '../database/rows'
 import { calculatePaymentAllocation, type Tender } from '../../domain/payments'
+import { calculateLineSubtotal } from '../../domain/pricing'
+import { calculateTaxInclusiveBreakdown } from '../../domain/tax'
 import { applyMovement, type StockEngineDependencies } from './stockEngine'
 import type { Clock } from './clock'
 import type { FaultInjector } from './fault-injector'
@@ -15,7 +20,7 @@ import { noFaults } from './fault-injector'
 import type { IdGenerator } from './ids'
 import { createUlidGenerator } from './ids'
 import type { Actor } from './permissions'
-import { serviceErr, serviceOk, type ServiceResult } from './result'
+import { serviceErr, serviceOk, type ServiceResult, ServiceTransactionError } from './result'
 import { writeAudit } from './audit'
 
 export type PurchaseLineInput = {
@@ -50,10 +55,12 @@ type PurchaseDeps = {
 
 function computeLineTotals(lines: PurchaseLineInput[], taxEnabled: boolean): { lineSubtotalPiasters: number; taxPiasters: number; lineTotalPiasters: number }[] {
   return lines.map((line) => {
-    const lineSubtotalPiasters = line.unitCostPiasters * line.qtyBase / line.pricedUnitQtyBase
+    const subtotalResult = calculateLineSubtotal(line.unitCostPiasters, line.qtyBase, line.pricedUnitQtyBase)
+    const subtotal = subtotalResult.ok ? subtotalResult.value : 0
     const taxRateBps = taxEnabled ? (line.taxRateBps ?? 0) : 0
-    const taxPiasters = Math.floor(lineSubtotalPiasters * taxRateBps / 10000)
-    return { lineSubtotalPiasters: Math.round(lineSubtotalPiasters), taxPiasters, lineTotalPiasters: Math.round(lineSubtotalPiasters) + taxPiasters }
+    const taxBreakdown = calculateTaxInclusiveBreakdown(subtotal, taxRateBps, taxEnabled)
+    const taxPiasters = taxBreakdown.ok ? taxBreakdown.value.tax : 0
+    return { lineSubtotalPiasters: subtotal, taxPiasters, lineTotalPiasters: subtotal }
   })
 }
 
@@ -89,8 +96,6 @@ export class PurchaseService {
       const purchaseId = this.ids.next()
       const purchaseNumber = String(nextSequenceNumber(this.deps.database, this.deps.deviceId, 'purchase', now))
       this.faults.after('purchase.sequence_allocated')
-
-      let resultRef!: ServiceResult<PurchaseResult>
 
       runInTransaction(this.deps.database, (tx) => {
         insertPurchase(tx, {
@@ -143,8 +148,7 @@ export class PurchaseService {
             deviceId: this.deps.deviceId,
           })
           if (!stockResult.ok) {
-            resultRef = serviceErr(stockResult.error.code, stockResult.error)
-            throw new Error('stock_error')
+            throw new ServiceTransactionError(serviceErr(stockResult.error.code, stockResult.error))
           }
           this.faults.after(`purchase.item.${i}.stock_applied`)
 
@@ -187,25 +191,6 @@ export class PurchaseService {
             deviceId: this.deps.deviceId,
           })
         }
-
-        // Supplier credit for unpaid balance
-        if (paymentResult.value.duePiasters > 0 && input.supplierId) {
-          insertMoneyLedgerEntry(tx, {
-            id: this.ids.next(),
-            entryType: 'purchase_credit',
-            direction: 'in',
-            amountPiasters: paymentResult.value.duePiasters,
-            paymentMethod: 'credit',
-            supplierId: input.supplierId,
-            referenceType: 'purchase',
-            referenceId: purchaseId,
-            occurredAt: now,
-            userId: actor.userId,
-            createdAt: now,
-            updatedAt: now,
-            deviceId: this.deps.deviceId,
-          })
-        }
         this.faults.after('purchase.money_inserted')
 
         writeAudit(tx, this.ids, {
@@ -216,14 +201,12 @@ export class PurchaseService {
         this.faults.after('purchase.audited')
       })
 
-      if (resultRef !== undefined && !resultRef.ok) return resultRef
-
       const purchase = getPurchase(this.deps.database, purchaseId)
       const items = listPurchaseItems(this.deps.database, purchaseId)
       if (purchase === undefined) return serviceErr('database_error')
       return serviceOk({ purchase, items })
     } catch (e: unknown) {
-      if (e instanceof Error && e.message === 'stock_error') return resultRef
+      if (e instanceof ServiceTransactionError) return e.result
       return serviceErr('database_error', e)
     }
   }
