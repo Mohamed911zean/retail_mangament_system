@@ -32,11 +32,21 @@ export type VerifyReport = {
   errors: VerifyError[]
 }
 
-export type BalanceSnapshot = {
+export type CustomerBalanceSnapshot = {
   customerId: string
   balancePiasters: number
+  status: 'due' | 'credit' | 'settled'
+}
+
+export type SupplierBalanceSnapshot = {
   supplierId: string
-  supplierBalancePiasters: number
+  balancePiasters: number
+  status: 'payable' | 'credit' | 'settled'
+}
+
+export type BalanceSnapshot = {
+  customers: CustomerBalanceSnapshot[]
+  suppliers: SupplierBalanceSnapshot[]
 }
 
 type ProductRow = { product_id: string; qty: number; value: number }
@@ -345,11 +355,7 @@ export function verifyDatabase(database: Database.Database): VerifyReport {
     const purchases = database.prepare(
       'SELECT status, due_piasters AS duePiasters FROM purchases WHERE supplier_id = ?',
     ).all(supplier.id) as { status: 'completed' | 'voided'; duePiasters: number }[]
-    const payments = signedRows(
-      database,
-      "SELECT direction, amount_piasters AS amountPiasters FROM money_ledger WHERE supplier_id = ? AND entry_type IN ('supplier_payment','purchase_payment')",
-      [supplier.id],
-    )
+    const payments = signedRows(database, "SELECT direction, amount_piasters AS amountPiasters FROM money_ledger WHERE supplier_id = ? AND entry_type = 'supplier_payment'", [supplier.id])
     const result = calculateSupplierBalance({ purchases, payments })
     if (!result.ok) errors.push({ code: 'db_integrity', message: `supplier balance calculation failed for ${supplier.id}` })
   }
@@ -380,23 +386,28 @@ export function verifyDatabase(database: Database.Database): VerifyReport {
   }
 }
 
-export function getBalances(database: Database.Database): BalanceSnapshot[] {
+export function getBalances(database: Database.Database): BalanceSnapshot {
   const customerRows = database.prepare('SELECT id FROM customers').all() as { id: string }[]
   const supplierRows = database.prepare('SELECT id FROM suppliers').all() as { id: string }[]
-  const snapshots: BalanceSnapshot[] = []
+  const customers: CustomerBalanceSnapshot[] = []
+  const suppliers: SupplierBalanceSnapshot[] = []
+
   for (const customer of customerRows) {
     const sales = database.prepare('SELECT status, due_piasters AS duePiasters FROM sales WHERE customer_id = ?').all(customer.id) as { status: 'completed' | 'voided'; duePiasters: number }[]
     const receipts = signedRows(database, "SELECT direction, amount_piasters AS amountPiasters FROM money_ledger WHERE customer_id = ? AND entry_type = 'customer_receipt'", [customer.id])
     const returns = database.prepare('SELECT status, credited_to_account_piasters AS creditedToAccountPiasters FROM sale_returns WHERE customer_id = ?').all(customer.id) as { status: 'completed' | 'voided'; creditedToAccountPiasters: number }[]
     const result = calculateCustomerBalance({ sales, receipts, returns })
     if (!result.ok || !Number.isSafeInteger(result.value.balancePiasters)) throw new Error(`balance_mismatch:${customer.id}`)
-    for (const supplier of supplierRows) {
-      const purchases = database.prepare('SELECT status, due_piasters AS duePiasters FROM purchases WHERE supplier_id = ?').all(supplier.id) as { status: 'completed' | 'voided'; duePiasters: number }[]
-      const payments = signedRows(database, "SELECT direction, amount_piasters AS amountPiasters FROM money_ledger WHERE supplier_id = ? AND entry_type IN ('supplier_payment','purchase_payment')", [supplier.id])
-      const supplierResult = calculateSupplierBalance({ purchases, payments })
-      if (!supplierResult.ok || !Number.isSafeInteger(supplierResult.value.balancePiasters)) throw new Error(`balance_mismatch:${supplier.id}`)
-      snapshots.push({ customerId: customer.id, balancePiasters: result.value.balancePiasters, supplierId: supplier.id, supplierBalancePiasters: supplierResult.value.balancePiasters })
-    }
+    customers.push({ customerId: customer.id, balancePiasters: result.value.balancePiasters, status: result.value.status })
   }
-  return snapshots
+
+  for (const supplier of supplierRows) {
+    const purchases = database.prepare('SELECT status, due_piasters AS duePiasters FROM purchases WHERE supplier_id = ?').all(supplier.id) as { status: 'completed' | 'voided'; duePiasters: number }[]
+    const payments = signedRows(database, "SELECT direction, amount_piasters AS amountPiasters FROM money_ledger WHERE supplier_id = ? AND entry_type = 'supplier_payment'", [supplier.id])
+    const supplierResult = calculateSupplierBalance({ purchases, payments })
+    if (!supplierResult.ok || !Number.isSafeInteger(supplierResult.value.balancePiasters)) throw new Error(`balance_mismatch:${supplier.id}`)
+    suppliers.push({ supplierId: supplier.id, balancePiasters: supplierResult.value.balancePiasters, status: supplierResult.value.status })
+  }
+
+  return { customers, suppliers }
 }
