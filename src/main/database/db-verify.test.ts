@@ -210,6 +210,37 @@ describe('db:verify comprehensive suite', () => {
     db.prepare("UPDATE purchases SET supplier_id = 's1' WHERE id = 'pur1'").run()
     db.exec('PRAGMA foreign_keys = ON;')
 
+    // 14. balance_mismatch and db_integrity
+    db.exec(`
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE money_ledger_corrupt (
+        id TEXT PRIMARY KEY, entry_type TEXT, direction TEXT, amount_piasters INTEGER,
+        payment_method TEXT, customer_id TEXT, supplier_id TEXT, sale_id TEXT,
+        reference_type TEXT, reference_id TEXT, reverses_entry_id TEXT, shift_id TEXT,
+        reference_text TEXT, tendered_piasters INTEGER, change_piasters INTEGER,
+        occurred_at INTEGER, user_id TEXT, created_at INTEGER, updated_at INTEGER, device_id TEXT
+      );
+      INSERT INTO money_ledger_corrupt SELECT * FROM money_ledger;
+      DROP TABLE money_ledger;
+      ALTER TABLE money_ledger_corrupt RENAME TO money_ledger;
+      PRAGMA foreign_keys = ON;
+    `)
+    db.prepare(`
+      INSERT INTO money_ledger (id,entry_type,direction,amount_piasters,payment_method,customer_id,occurred_at,user_id,created_at,updated_at,device_id)
+      VALUES ('ml_overflow','customer_receipt','in',9007199254740992,'cash','c1',1700000000000,'u1',1700000000000,1700000000000,'d1')
+    `).run()
+    expect(verifyDatabase(db).errors.some((e) => e.code === 'balance_mismatch')).toBe(true)
+    expect(() => getBalances(db)).toThrow()
+    db.prepare("DELETE FROM money_ledger WHERE id = 'ml_overflow'").run()
+
+    // 15. db_integrity (corrupted supplier calculation)
+    db.prepare(`
+      INSERT INTO money_ledger (id,entry_type,direction,amount_piasters,payment_method,supplier_id,occurred_at,user_id,created_at,updated_at,device_id)
+      VALUES ('ml_sup_inv','supplier_payment','out',9007199254740992,'cash','s1',1700000000000,'u1',1700000000000,1700000000000,'d1')
+    `).run()
+    expect(verifyDatabase(db).errors.some((e) => e.code === 'db_integrity' || e.code === 'balance_mismatch')).toBe(true)
+    db.prepare("DELETE FROM money_ledger WHERE id = 'ml_sup_inv'").run()
+
     closeDatabase(context)
     rmSync(root, { recursive: true, force: true })
   })

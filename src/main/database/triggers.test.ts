@@ -101,7 +101,29 @@ describe('append-only and guarded triggers', () => {
     expect(() => context.database.exec("DELETE FROM purchase_items WHERE id = 'puri1'")).toThrow('immutable_purchase_item_delete')
     expect(() => context.database.exec("UPDATE sale_return_items SET refund_piasters = 2 WHERE id = 'reti1'")).toThrow('immutable_sale_return_item_update')
     expect(() => context.database.exec("DELETE FROM sale_return_items WHERE id = 'reti1'")).toThrow('immutable_sale_return_item_delete')
-    expect(() => context.database.prepare("UPDATE purchases SET status = 'voided', updated_at = ? WHERE id = 'pur1'").run(now)).toThrow('void_requires_metadata')
+    // Guarded document updates: cannot alter immutable financial columns
+    expect(() => context.database.exec("UPDATE purchases SET total_piasters = 999 WHERE id = 'pur1'")).toThrow('guarded_purchases_update')
+    expect(() => context.database.exec("UPDATE sale_returns SET total_piasters = 999 WHERE id = 'ret1'")).toThrow('guarded_sale_returns_update')
+    expect(() => context.database.exec("UPDATE stock_counts SET started_at = 999 WHERE id = 'sc1'")).toThrow('guarded_stock_counts_update')
+
+    // Void is final on sales
+    context.database.prepare("UPDATE sales SET status = 'voided', voided_at = ?, voided_by_user_id = 'u1', void_reason = 'test', updated_at = ? WHERE id = 's1'").run(now, now)
+    expect(() => context.database.exec("UPDATE sales SET status = 'completed' WHERE id = 's1'")).toThrow('void_is_final')
+
+    // Stock count items can be modified/deleted while count is draft, but blocked once posted
+    context.database.exec(`
+      INSERT INTO stock_counts (id,status,started_at,user_id,created_at,updated_at,device_id)
+      VALUES ('sc2','draft',${now},'u1',${now},${now},'d1');
+      INSERT INTO stock_count_items (id,stock_count_id,product_id,expected_qty_base,counted_qty_base,difference_qty_base,created_at,updated_at,device_id)
+      VALUES ('sci2','sc2','p1',5,5,0,${now},${now},'d1');
+    `)
+    // Allowed on draft
+    context.database.exec("UPDATE stock_count_items SET counted_qty_base = 6, difference_qty_base = 1 WHERE id = 'sci2'")
+    expect(context.database.prepare("SELECT counted_qty_base FROM stock_count_items WHERE id = 'sci2'").get()).toEqual({ counted_qty_base: 6 })
+    context.database.exec("DELETE FROM stock_count_items WHERE id = 'sci2'")
+    expect(context.database.prepare("SELECT COUNT(*) AS c FROM stock_count_items WHERE id = 'sci2'").get()).toEqual({ c: 0 })
+
+    expect(() => context.database.exec("UPDATE purchases SET status = 'voided', updated_at = ? WHERE id = 'pur1'").run(now)).toThrow('void_requires_metadata')
     context.database.prepare("UPDATE purchases SET status = 'voided', voided_at = ?, voided_by_user_id = 'u1', void_reason = ?, updated_at = ? WHERE id = 'pur1'").run(now, 'test', now)
     expect(() => context.database.exec("UPDATE purchases SET status = 'completed' WHERE id = 'pur1'")).toThrow('void_is_final')
     expect(() => context.database.prepare("UPDATE sale_returns SET status = 'voided', updated_at = ? WHERE id = 'ret1'").run(now)).toThrow('void_requires_metadata')
