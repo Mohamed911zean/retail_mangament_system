@@ -117,6 +117,37 @@ The following commands were executed immediately upon taking over:
 11. **Documentation & Review Bundle (C10):**
     - Write `docs/services.md`.
     - Update `docs/DECISIONS.md` and `docs/database.md`.
-    - Generate `docs/reports/batch-c-review-bundle.md` with Recovery Notes.
-    - Tag `phase1-services-green`.
-    - Commit: `docs(report): batch C review bundle`.
+120:    - Generate `docs/reports/batch-c-review-bundle.md` with Recovery Notes.
+121:    - Tag `phase1-services-green`.
+122:    - Commit: `docs(report): batch C review bundle`.
+123: 
+124: ---
+125: 
+126: ## 6. Round 2 Verification (Takeover Reality Re-check)
+127: 
+128: - **Takeover Commit Baseline:** `5fe4edc` ("phase 1 c6")
+129: - **Initial Status Re-Check:**
+130:   - `npm test`: **PASS** (33 test files, 200 tests passing).
+131:   - `npm run lint`: **PASS** (0 errors, 0 warnings).
+132:   - `npm run build`: **FAIL -> FIXED** (Fixed `resultRef`/`saleResult` block scope bug in `sales.ts`, `saleReturns.ts`, `purchases.ts` via `ServiceTransactionError`, and top import in `purchases.ts`).
+133:   - `npm run db:migrate`: **PASS** (migrated: 8).
+134:   - `npm run db:verify`: **PASS** (`{ ok: true, errors: [] }`).
+135: 
+136: ### Grep & Code Invariant Inspection
+137: 1. `Date.now()` and `Math.random()`: Checked across `src/main/services/`. All services strictly use injected `Clock` (`this.deps.clock.now()`) and `IdGenerator` (`this.ids.next()`). No direct clock or random calls in service logic.
+138: 2. Financial / Domain Math: Found and fixed floating-point math (`Math.floor` / `Math.round`) in `purchases.ts` `computeLineTotals`. Routed calculation through `src/domain/pricing.ts` (`calculateLineSubtotal`) and `src/domain/tax.ts` (`calculateTaxInclusiveBreakdown`).
+139: 3. Ledger Entries: Removed redundant `sale_credit` and `purchase_credit` money ledger entries from `sales.ts` and `purchases.ts`. In accordance with `docs/schema-v1.md` and `src/domain/balances.ts`, customer and supplier credit balances are derived directly from document `due_piasters`, not money ledger movement rows.
+140: 4. Transactions and Stock: Verified that all mutating service operations use exactly one `runInTransaction(this.deps.database, (tx) => { ... })`, write audit records via `writeAudit(tx, ...)`, and mutate stock exclusively through `applyMovement(tx, ...)` in `stockEngine.ts`.
+141: 
+142: ### Corrected Original Step Map (R1–R6)
+143: 
+144: | Phase Step | Sub-Step | Target / Scope |
+145: |---|---|---|
+146: | **R0** | Re-verify reality | Verify all commands, fix defects, document audit. (DONE) |
+147: | **R1** | C0d / C0e database tests | Corrupted-DB test per `db:verify` code (all 18 codes) in `db-verify.test.ts`, exhaustive trigger tests in `triggers.test.ts`. |
+148: | **R2** | Service unit tests | Comprehensive test suites for existing services: `stockEngine`, `sales` (`completeSale`), `purchases` (`receivePurchase`), `saleReturns`, `users` (auth, scrypt, lockout), `catalog`, `settings`. |
+149: | **R3** | C6 Voids | Implement `VoidService` (`voidSale`, `voidPurchase`, `voidSaleReturn`, `voidExpense`) with `calculateVoidCompensation`, reversals, audit snapshots, and tests. |
+150: | **R4** | C7 Shifts & Cash | Implement `ShiftService` (open/close, cash reconciliation, expenses, customer receipts, supplier payments, manual cash) and tests. |
+151: | **R5** | C9 Integration | Failure-injection suite across named steps + Seeded Scenario Test (>=300 operations with `verifyDatabase` after each). |
+152: | **R6** | C10 Docs & Bundle | Complete `docs/services.md`, `DECISIONS.md`, `docs/database.md` error table, `docs/reports/batch-c-review-bundle.md`, and tag `phase1-services-green`. |
+
