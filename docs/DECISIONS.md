@@ -572,3 +572,66 @@ transaction after every stock movement.
   supplier balances do not exist in the frozen schema, so verification
   recomputes them from ledgers rather than inventing columns.
 - Full repository service orchestration remains deferred to Batch C.
+
+## Decision #7 - Void compensations run through the stock engine
+
+**Date:** 2026-10-09  
+**Status:** Accepted; extends Decision #4.
+
+- Decision #4 requires settlement and normalization after **every** stock
+  movement, including void compensations. Batch C originally wrote
+  `void_compensation` rows with raw inserts, so a purchase void that drained
+  stock to zero left the negated value behind (`qty == 0` with `value != 0`),
+  violating invariant I1.
+- New engine function `applyCompensationMovement` is now the only writer of
+  `void_compensation` rows. It keeps the exact negated qty/value from
+  `calculateVoidCompensation` (never re-values at the current average), skips
+  the negative-stock refusal (the void domain already validated legality),
+  applies `calculateNegativeStockSettlement` when an incoming compensation
+  lifts stock out of negative, and always finishes with
+  `calculateStockNormalization`.
+- Compensation rows keep `reverses_movement_id`, so the verifier's
+  `reversal_sign` check still requires the exact inversion of the original.
+
+## Decision #8 - Customer receipts and supplier payments
+
+**Date:** 2026-10-09  
+**Status:** Accepted for the v1 treasury scope.
+
+- Account-level receipts/payments are single `money_ledger` rows:
+  `customer_receipt`/`in` and `supplier_payment`/`out`, methods
+  `cash`/`card`/`wallet`. Cash rows take the current open shift's id when
+  shifts are enabled (refused with `invalid_shift_state` otherwise); card and
+  wallet rows carry no shift id because only cash affects drawer expectation.
+- A reversal is a compensating row with the **same entry type** and the
+  opposite direction, linked by `reverses_entry_id`, gated on `document.void`.
+  The frozen schema derives balances by summing those entry types ("the net
+  receipt total is recomputed from the ledger"), so the reversal is included
+  automatically; no balance column is ever written. Using the original entry
+  type (rather than `void_compensation`) is what keeps the frozen balance
+  queries correct without changing `db:verify`. Reversals are once-only,
+  enforced by `ux_money_ledger_reversal` and a friendly
+  `reversal_already_exists` code.
+- `repositories/balances.ts` is the single SQL source for derived balances; the
+  sale credit-limit check and the operator-facing balance read share it, so they
+  cannot disagree.
+- The sale service now enforces a positive `credit_limit_piasters` against the
+  receipt-aware balance (`credit_limit_exceeded`), with an audited
+  owner/manager `sale.credit_override`. This closes a Batch C gap against the
+  frozen schema ("a positive limit is enforced by the sale service").
+
+## Decision #9 - Verifier compensation-rule loosening (recorded)
+
+**Date:** 2026-10-09  
+**Status:** Accepted; documented for review.
+
+- `document_stock_mismatch` / `purchase_stock_mismatch` sum only the document's
+  own movement types (`sale`, `purchase`) so a valid `void_compensation` row
+  carrying the document's reference does not break the equality.
+- `reversal_metadata_mismatch` accepts `entry_type = 'void_compensation'` for a
+  reversal while still requiring `payment_method`, `customer_id`, and
+  `supplier_id` to match the original.
+- Corruption proofs in `db-verify.test.ts` show both rules still fire when a
+  document's own totals are wrong or a reversal's metadata/amount does not
+  match, so detection strength is unchanged.
+

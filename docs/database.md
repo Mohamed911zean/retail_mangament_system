@@ -92,6 +92,10 @@ Verifier codes are:
 | `reversal_metadata_mismatch` | reversal metadata does not match its original |
 | `balance_mismatch` | derived balance is invalid or outside safe integer range |
 
+The table above is the authoritative list; it mirrors the `VerifyError['code']`
+union in `src/main/database/db-verify.ts` one-to-one (18 codes). Each `db:verify`
+error also carries the `messageKey` `errors.<code>` for the Arabic UI.
+
 The frozen schema stores customer and supplier balances as derived values, not
 columns. The verifier therefore validates that their ledger inputs are
 accepted by the pure balance functions; there is no stored balance to compare.
