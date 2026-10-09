@@ -135,7 +135,7 @@ export function verifyDatabase(database: Database.Database): VerifyReport {
     }
     const saleMovement = database.prepare(`
       SELECT COALESCE(SUM(-qty_delta),0) AS qty, COALESCE(SUM(-value_delta_piasters),0) AS value
-      FROM stock_movements WHERE reference_type = 'sale' AND reference_id = ?
+      FROM stock_movements WHERE reference_type = 'sale' AND reference_id = ? AND movement_type = 'sale'
     `).get(sale.id) as { qty: number; value: number }
     const saleItems = database.prepare(
       'SELECT COALESCE(SUM(qty_base),0) AS qty, COALESCE(SUM(line_cost_piasters),0) AS value FROM sale_items WHERE sale_id = ?',
@@ -156,7 +156,7 @@ export function verifyDatabase(database: Database.Database): VerifyReport {
     }
     const movement = database.prepare(`
       SELECT COALESCE(SUM(qty_delta),0) AS qty FROM stock_movements
-      WHERE reference_type = 'purchase' AND reference_id = ?
+      WHERE reference_type = 'purchase' AND reference_id = ? AND movement_type = 'purchase'
     `).get(purchase.id) as { qty: number }
     const items = database.prepare('SELECT COALESCE(SUM(qty_base),0) AS qty FROM purchase_items WHERE purchase_id = ?').get(purchase.id) as { qty: number }
     if (movement.qty !== items.qty) errors.push({ code: 'document_stock_mismatch', message: `purchase ${purchase.id} stock movement mismatch` })
@@ -269,7 +269,7 @@ export function verifyDatabase(database: Database.Database): VerifyReport {
     } else if (row.reversal_amount !== row.original_amount || row.reversal_direction === row.original_direction) {
       errors.push({ code: 'reversal_sign', message: `ledger reversal ${row.reversal_id} does not invert its original` })
     } else if (
-      row.reversal_entry_type !== row.original_entry_type ||
+      (row.reversal_entry_type !== 'void_compensation' && row.reversal_entry_type !== row.original_entry_type) ||
       row.reversal_payment_method !== row.original_payment_method ||
       row.reversal_customer_id !== row.original_customer_id ||
       row.reversal_supplier_id !== row.original_supplier_id
