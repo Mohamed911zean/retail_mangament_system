@@ -323,3 +323,190 @@ describe('VoidService', () => {
     rmSync(root, { recursive: true, force: true })
   })
 })
+
+// ─── Stock normalisation on void compensations (Decision #4) ──────────────────
+//
+// Every stock movement — including void compensations — must leave the ledger
+// inside its invariants: (qty == 0 => value == 0) and (qty > 0 => value >= 0).
+// Compensations keep the exact negated qty/value from `calculateVoidCompensation`
+// and are then run through the engine: an incoming compensation that lifts stock
+// out of negative receives the negative-stock settlement, and every compensation
+// always finishes with `calculateStockNormalization`.
+
+function onHandValue(database: TestDb, productId: string): number {
+  const row = database.prepare('SELECT COALESCE(SUM(value_delta_piasters),0) AS value FROM stock_movements WHERE product_id = ?').get(productId) as { value: number }
+  return row.value
+}
+
+function seedStock(database: TestDb, qty: number, value: number): void {
+  const now = fixedClock.now()
+  database.prepare(`
+    INSERT INTO stock_movements (id,product_id,qty_delta,value_delta_piasters,movement_type,occurred_at,created_by_user_id,created_at,updated_at,device_id)
+    VALUES ('sm_seed','p1',?,?,'purchase',${now},'u1',${now},${now},'d1')
+  `).run(qty, value)
+}
+
+function revaluationRows(database: TestDb): { qty_delta: number; value_delta_piasters: number; reason: string }[] {
+  return database.prepare(
+    "SELECT qty_delta, value_delta_piasters, reason FROM stock_movements WHERE movement_type = 'revaluation' ORDER BY rowid",
+  ).all() as { qty_delta: number; value_delta_piasters: number; reason: string }[]
+}
+
+describe('VoidService stock normalisation', () => {
+  it('voidPurchase: compensation that zeroes stock normalises the leftover value (revaluation +250)', async () => {
+    // Hand-checked arithmetic (piasters / base units):
+    //   seed            (qty 5,  value  500)        weighted average 100/unit
+    //   receivePurchase 5 @ 200 = 1000              -> (10, 1500)
+    //   sell 5 @ 150    cost = round(1500*5/10)=750 -> (5, 750)
+    //   voidPurchase    reverses +5/+1000 with -5/-1000 -> (0, -250)
+    //   normalisation   qty == 0 with value != 0 => revaluation +250 (qtyDelta 0) -> (0, 0)
+    const root = join(tmpdir(), `small-shop-pos-void-norm-purchase-${Date.now()}`)
+    mkdirSync(root, { recursive: true })
+    const context = await openDatabase(join(root, 'user-data'), join(process.cwd(), 'migrations'))
+    setupVoidDb(context.database, { withSeedStock: false })
+    seedStock(context.database, 5, 500)
+    const services = makeServices(context.database, testIds())
+
+    const purchase = await services.purchases.receivePurchase(managerActor, {
+      supplierId: 's1',
+      lines: [{ productId: 'p1', unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 5, unitCostPiasters: 200 }],
+      tenders: [{ method: 'cash', amountPiasters: 1000 }],
+      taxEnabled: false,
+    })
+    if (!purchase.ok) throw new Error('purchase failed')
+    expect(onHand(context.database, 'p1')).toBe(10)
+    expect(onHandValue(context.database, 'p1')).toBe(1500)
+
+    const sale = await services.sales.completeSale(cashierActor, {
+      shiftId: 'sh1',
+      lines: [{ productId: 'p1', unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 5, unitPricePiasters: 150 }],
+      tenders: [{ method: 'cash', amountPiasters: 750 }],
+      taxEnabled: false,
+      cashRoundingStep: 0,
+    })
+    if (!sale.ok) throw new Error('sale failed')
+    expect(sale.value.items[0].lineCostPiasters).toBe(750)
+    expect(onHand(context.database, 'p1')).toBe(5)
+    expect(onHandValue(context.database, 'p1')).toBe(750)
+
+    const voided = await services.voids.voidPurchase(managerActor, { documentId: purchase.value.purchase.id, reason: 'wrong invoice' })
+    expect(voided.ok).toBe(true)
+    expect(onHand(context.database, 'p1')).toBe(0)
+    expect(onHandValue(context.database, 'p1')).toBe(0)
+    expect(revaluationRows(context.database)).toEqual([
+      { qty_delta: 0, value_delta_piasters: 250, reason: 'stock_normalization' },
+    ])
+
+    expect(verifyDatabase(context.database).ok).toBe(true)
+    closeDatabase(context)
+    rmSync(root, { recursive: true, force: true })
+  })
+
+  it('voidSale: restocking across zero applies negative-stock settlement (revaluation -600)', async () => {
+    // allowNegativeStock = true. Product default cost 100.
+    //   seed none                              -> (0, 0)
+    //   sell 5 @ 150: cost = round(100*5/1) = 500 -> (-5, -500)
+    //   receivePurchase 3 @ 300 = 900          -> (-2, 400)  (ends negative, no settlement)
+    //   voidSale reverses -5/-500 with +5/+500 (incoming, crosses to +3):
+    //     desired   = round(500 * 3 / 5) = 300
+    //     valueAfter = 400 + 500 = 900
+    //     revaluation = 300 - 900 = -600       -> (3, 300)
+    const root = join(tmpdir(), `small-shop-pos-void-norm-negative-${Date.now()}`)
+    mkdirSync(root, { recursive: true })
+    const context = await openDatabase(join(root, 'user-data'), join(process.cwd(), 'migrations'))
+    setupVoidDb(context.database, { withSeedStock: false })
+    const services = makeServices(context.database, testIds(), true)
+
+    const sale = await services.sales.completeSale(cashierActor, {
+      shiftId: 'sh1',
+      lines: [{ productId: 'p1', unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 5, unitPricePiasters: 150 }],
+      tenders: [{ method: 'cash', amountPiasters: 750 }],
+      taxEnabled: false,
+      cashRoundingStep: 0,
+    })
+    if (!sale.ok) throw new Error('sale failed')
+    expect(onHand(context.database, 'p1')).toBe(-5)
+    expect(onHandValue(context.database, 'p1')).toBe(-500)
+
+    const purchase = await services.purchases.receivePurchase(managerActor, {
+      supplierId: 's1',
+      lines: [{ productId: 'p1', unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 3, unitCostPiasters: 300 }],
+      tenders: [{ method: 'cash', amountPiasters: 900 }],
+      taxEnabled: false,
+    })
+    if (!purchase.ok) throw new Error('purchase failed')
+    expect(onHand(context.database, 'p1')).toBe(-2)
+    expect(onHandValue(context.database, 'p1')).toBe(400)
+
+    const voided = await services.voids.voidSale(managerActor, { documentId: sale.value.sale.id, reason: 'mis-keyed sale' })
+    expect(voided.ok).toBe(true)
+    expect(onHand(context.database, 'p1')).toBe(3)
+    expect(onHandValue(context.database, 'p1')).toBe(300)
+    expect(revaluationRows(context.database)).toEqual([
+      { qty_delta: 0, value_delta_piasters: -600, reason: 'negative_stock_settlement' },
+    ])
+
+    expect(verifyDatabase(context.database).ok).toBe(true)
+    closeDatabase(context)
+    rmSync(root, { recursive: true, force: true })
+  })
+
+  it('voidSaleReturn: reverses the exact resalable restock value, not the current average', async () => {
+    //   seed (qty 10, value 1000)              weighted average 100/unit
+    //   sell 2 @ 150: cost = round(1000*2/10)=200 -> (8, 800); sale line cost 200
+    //   return 1 resalable: restock = round(200*1/2) = 100 -> (9, 900)
+    //   receivePurchase 10 @ 200 = 2000        -> (19, 2900)  (average now ~152.6)
+    //   voidSaleReturn reverses +1/+100 with -1/-100 (the exact restock, NOT the new average)
+    //                                          -> (18, 2800)
+    const root = join(tmpdir(), `small-shop-pos-void-norm-return-${Date.now()}`)
+    mkdirSync(root, { recursive: true })
+    const context = await openDatabase(join(root, 'user-data'), join(process.cwd(), 'migrations'))
+    setupVoidDb(context.database, { withSeedStock: false })
+    seedStock(context.database, 10, 1000)
+    const services = makeServices(context.database, testIds())
+
+    const sale = await services.sales.completeSale(cashierActor, {
+      shiftId: 'sh1',
+      lines: [{ productId: 'p1', unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 2, unitPricePiasters: 150 }],
+      tenders: [{ method: 'cash', amountPiasters: 300 }],
+      taxEnabled: false,
+      cashRoundingStep: 0,
+    })
+    if (!sale.ok) throw new Error('sale failed')
+    expect(onHand(context.database, 'p1')).toBe(8)
+    expect(onHandValue(context.database, 'p1')).toBe(800)
+
+    const returned = await services.returns.processReturn(cashierActor, {
+      originalSaleId: sale.value.sale.id,
+      shiftId: 'sh1',
+      lines: [{ saleItemId: sale.value.items[0].id, qtyBase: 1, condition: 'resalable' }],
+    })
+    if (!returned.ok) throw new Error('return failed')
+    expect(onHand(context.database, 'p1')).toBe(9)
+    expect(onHandValue(context.database, 'p1')).toBe(900)
+
+    const purchase = await services.purchases.receivePurchase(managerActor, {
+      supplierId: 's1',
+      lines: [{ productId: 'p1', unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 10, unitCostPiasters: 200 }],
+      tenders: [{ method: 'cash', amountPiasters: 2000 }],
+      taxEnabled: false,
+    })
+    if (!purchase.ok) throw new Error('purchase failed')
+    expect(onHand(context.database, 'p1')).toBe(19)
+    expect(onHandValue(context.database, 'p1')).toBe(2900)
+
+    const voided = await services.voids.voidSaleReturn(managerActor, { documentId: returned.value.saleReturn.id, reason: 'return entered by mistake' })
+    expect(voided.ok).toBe(true)
+    expect(onHand(context.database, 'p1')).toBe(18)
+    expect(onHandValue(context.database, 'p1')).toBe(2800)
+
+    const compensation = context.database.prepare(
+      "SELECT qty_delta, value_delta_piasters FROM stock_movements WHERE movement_type = 'void_compensation' AND reference_type = 'sale_return' AND reference_id = ?",
+    ).get(returned.value.saleReturn.id) as { qty_delta: number; value_delta_piasters: number }
+    expect(compensation).toEqual({ qty_delta: -1, value_delta_piasters: -100 })
+
+    expect(verifyDatabase(context.database).ok).toBe(true)
+    closeDatabase(context)
+    rmSync(root, { recursive: true, force: true })
+  })
+})

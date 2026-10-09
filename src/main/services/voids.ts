@@ -8,9 +8,10 @@ import { updateSaleVoidMetadata } from '../database/repositories/sales'
 import { updatePurchaseVoidMetadata } from '../database/repositories/purchases'
 import { updateSaleReturnVoidMetadata } from '../database/repositories/sale-returns'
 import { listMoneyLedgerByReference, insertMoneyLedgerEntry } from '../database/repositories/money-ledger'
-import { getOnHand, insertStockMovement } from '../database/repositories/stock'
+import { getOnHand } from '../database/repositories/stock'
 import { listSaleReturnsBySale } from '../database/repositories/sale-returns'
 import { calculateVoidCompensation } from '../../domain/voids'
+import { applyCompensationMovement, type StockEngineDependencies } from './stockEngine'
 import { getOpenShift } from '../database/repositories/shifts'
 import type { Clock } from './clock'
 import type { FaultInjector } from './fault-injector'
@@ -48,9 +49,39 @@ type StockMovementRow = {
 export class VoidService {
   private readonly ids: IdGenerator
   private readonly faults: FaultInjector
+  private readonly engineDeps: StockEngineDependencies
   constructor(private readonly deps: VoidDeps) {
     this.ids = deps.ids ?? createUlidGenerator()
     this.faults = deps.faults ?? noFaults
+    this.engineDeps = { ids: this.ids, clock: deps.clock, faults: this.faults, allowNegativeStock: deps.allowNegativeStock }
+  }
+
+  // Compensations keep the exact negated qty/value from `calculateVoidCompensation`
+  // but are written through the stock engine so they settle negative stock on an
+  // incoming crossing and always finish with normalization (Decision #4).
+  private writeStockCompensations(
+    tx: DatabaseHandle,
+    documentId: string,
+    referenceType: string,
+    reason: string,
+    compensations: { productId: string; batchId: string | null; qtyDelta: number; valueDeltaPiasters: number; reversesMovementId: string }[],
+    userId: string,
+  ): void {
+    for (const compensation of compensations) {
+      const result = applyCompensationMovement(tx, this.engineDeps, {
+        productId: compensation.productId,
+        qtyDelta: compensation.qtyDelta,
+        valueDeltaPiasters: compensation.valueDeltaPiasters,
+        batchId: compensation.batchId,
+        referenceType,
+        referenceId: documentId,
+        reversesMovementId: compensation.reversesMovementId,
+        reason: `void: ${reason}`,
+        userId,
+        deviceId: this.deps.deviceId,
+      })
+      if (!result.ok) throw new ServiceTransactionError(serviceErr(result.error.code, result.error))
+    }
   }
 
   async voidSale(actor: Actor, input: VoidInput): Promise<ServiceResult<{ id: string }>> {
@@ -106,26 +137,7 @@ export class VoidService {
 
       runInTransaction(this.deps.database, (tx) => {
         this.faults.after('void.sale.start')
-        for (const sc of domainResult.value.stockCompensations) {
-          const movId = this.ids.next()
-          insertStockMovement(tx, {
-            id: movId,
-            productId: sc.productId,
-            batchId: sc.batchId,
-            qtyDelta: sc.qtyDelta,
-            valueDeltaPiasters: sc.valueDeltaPiasters,
-            movementType: 'void_compensation',
-            reversesMovementId: sc.reversesMovementId,
-            referenceType: 'sale',
-            referenceId: input.documentId,
-            occurredAt: now,
-            reason: `void: ${input.reason}`,
-            createdByUserId: actor.userId,
-            createdAt: now,
-            updatedAt: now,
-            deviceId: this.deps.deviceId,
-          })
-        }
+        this.writeStockCompensations(tx, input.documentId, 'sale', input.reason, domainResult.value.stockCompensations, actor.userId)
         this.faults.after('void.sale.stock_written')
         const moneyEntriesMap = new Map(moneyEntries.map((e) => [e.id, e]))
         for (const mc of domainResult.value.moneyCompensations) {
@@ -219,25 +231,7 @@ export class VoidService {
 
       runInTransaction(this.deps.database, (tx) => {
         this.faults.after('void.purchase.start')
-        for (const sc of domainResult.value.stockCompensations) {
-          insertStockMovement(tx, {
-            id: this.ids.next(),
-            productId: sc.productId,
-            batchId: sc.batchId,
-            qtyDelta: sc.qtyDelta,
-            valueDeltaPiasters: sc.valueDeltaPiasters,
-            movementType: 'void_compensation',
-            reversesMovementId: sc.reversesMovementId,
-            referenceType: 'purchase',
-            referenceId: input.documentId,
-            occurredAt: now,
-            reason: `void: ${input.reason}`,
-            createdByUserId: actor.userId,
-            createdAt: now,
-            updatedAt: now,
-            deviceId: this.deps.deviceId,
-          })
-        }
+        this.writeStockCompensations(tx, input.documentId, 'purchase', input.reason, domainResult.value.stockCompensations, actor.userId)
         this.faults.after('void.purchase.stock_written')
         const moneyEntriesMap = new Map(moneyEntries.map((e) => [e.id, e]))
         for (const mc of domainResult.value.moneyCompensations) {
@@ -329,25 +323,7 @@ export class VoidService {
 
       runInTransaction(this.deps.database, (tx) => {
         this.faults.after('void.sale_return.start')
-        for (const sc of domainResult.value.stockCompensations) {
-          insertStockMovement(tx, {
-            id: this.ids.next(),
-            productId: sc.productId,
-            batchId: sc.batchId,
-            qtyDelta: sc.qtyDelta,
-            valueDeltaPiasters: sc.valueDeltaPiasters,
-            movementType: 'void_compensation',
-            reversesMovementId: sc.reversesMovementId,
-            referenceType: 'sale_return',
-            referenceId: input.documentId,
-            occurredAt: now,
-            reason: `void: ${input.reason}`,
-            createdByUserId: actor.userId,
-            createdAt: now,
-            updatedAt: now,
-            deviceId: this.deps.deviceId,
-          })
-        }
+        this.writeStockCompensations(tx, input.documentId, 'sale_return', input.reason, domainResult.value.stockCompensations, actor.userId)
         this.faults.after('void.sale_return.stock_written')
         const moneyEntriesMap = new Map(moneyEntries.map((e) => [e.id, e]))
         for (const mc of domainResult.value.moneyCompensations) {

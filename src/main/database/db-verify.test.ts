@@ -244,4 +244,72 @@ describe('db:verify comprehensive suite', () => {
     closeDatabase(context)
     rmSync(root, { recursive: true, force: true })
   })
+
+  it('loosened compensation rules stay green on a valid void but still detect real corruption', async () => {
+    const root = join(tmpdir(), `small-shop-pos-verify-compensation-${Date.now()}`)
+    mkdirSync(root, { recursive: true })
+    const context = await openDatabase(join(root, 'user-data'), join(process.cwd(), 'migrations'))
+    const db = context.database
+    seedConsistentDatabase(db)
+    const now = 1700000000000
+
+    // These corruption steps need to mutate append-only rows, so their guards are
+    // dropped for this fixture only. The verifier reports `missing_append_only_trigger`
+    // as a consequence, so every assertion below targets a specific code.
+    db.exec('DROP TRIGGER trg_sale_items_no_update')
+    db.exec('DROP TRIGGER trg_purchase_items_no_update')
+    db.exec('DROP TRIGGER trg_money_ledger_no_delete')
+
+    // Void sale1 with the schema-designated compensation rows (exact negations).
+    db.prepare("UPDATE sales SET status = 'voided', voided_at = ?, voided_by_user_id = 'u1', void_reason = 'mis-keyed' WHERE id = 'sale1'").run(now)
+    db.prepare(`
+      INSERT INTO stock_movements (id,product_id,qty_delta,value_delta_piasters,movement_type,reverses_movement_id,reference_type,reference_id,occurred_at,created_by_user_id,created_at,updated_at,device_id)
+      VALUES ('sm_comp1','p1',1,100,'void_compensation','sm_sale1','sale','sale1',${now},'u1',${now},${now},'d1')
+    `).run()
+    db.prepare(`
+      INSERT INTO money_ledger (id,entry_type,direction,amount_piasters,payment_method,customer_id,sale_id,reference_type,reference_id,reverses_entry_id,shift_id,occurred_at,user_id,created_at,updated_at,device_id)
+      VALUES ('ml_comp1','void_compensation','out',150,'cash','c1','sale1','sale','sale1','ml_sale1','sh1',${now},'u1',${now},${now},'d1')
+    `).run()
+
+    // The loosened rules must not false-positive on a correctly voided document.
+    const baseline = verifyDatabase(db)
+    expect(baseline.errors.some((e) => e.code === 'document_stock_mismatch')).toBe(false)
+    expect(baseline.errors.some((e) => e.code === 'reversal_sign')).toBe(false)
+    expect(baseline.errors.some((e) => e.code === 'reversal_metadata_mismatch')).toBe(false)
+    expect(baseline.errors.some((e) => e.code === 'missing_void_compensation')).toBe(false)
+    expect(baseline.errors.some((e) => e.code === 'document_ledger_mismatch')).toBe(false)
+
+    // (1) A real sale stock mismatch is still caught even though a compensation row exists
+    //     (the rule sums only the sale's own `sale` movements, not the compensation).
+    db.prepare("UPDATE sale_items SET line_cost_piasters = 130 WHERE id = 'si1'").run()
+    expect(verifyDatabase(db).errors.some((e) => e.code === 'document_stock_mismatch')).toBe(true)
+    db.prepare("UPDATE sale_items SET line_cost_piasters = 100 WHERE id = 'si1'").run()
+
+    // (2) Same rule for purchases: their own `purchase` movement total must match items.
+    db.prepare("UPDATE purchase_items SET qty_base = 9 WHERE id = 'pi1'").run()
+    expect(verifyDatabase(db).errors.some((e) => e.code === 'document_stock_mismatch')).toBe(true)
+    db.prepare("UPDATE purchase_items SET qty_base = 10 WHERE id = 'pi1'").run()
+
+    // (3) A void_compensation reversal with mismatched metadata still fails
+    //     (correct amount and direction, wrong payment method). It reverses the
+    //     purchase payment, whose reversal slot is still free (the sale payment is
+    //     already reversed by ml_comp1 and reversals are unique).
+    db.prepare(`
+      INSERT INTO money_ledger (id,entry_type,direction,amount_piasters,payment_method,supplier_id,reverses_entry_id,occurred_at,user_id,created_at,updated_at,device_id)
+      VALUES ('ml_comp_bad_meta','void_compensation','in',1000,'card','s1','ml_pur1',${now},'u1',${now},${now},'d1')
+    `).run()
+    expect(verifyDatabase(db).errors.some((e) => e.code === 'reversal_metadata_mismatch')).toBe(true)
+    db.prepare("DELETE FROM money_ledger WHERE id = 'ml_comp_bad_meta'").run()
+
+    // (4) A void_compensation reversal that does not invert the amount still fails.
+    db.prepare(`
+      INSERT INTO money_ledger (id,entry_type,direction,amount_piasters,payment_method,supplier_id,reverses_entry_id,occurred_at,user_id,created_at,updated_at,device_id)
+      VALUES ('ml_comp_bad_amount','void_compensation','in',500,'cash','s1','ml_pur1',${now},'u1',${now},${now},'d1')
+    `).run()
+    expect(verifyDatabase(db).errors.some((e) => e.code === 'reversal_sign')).toBe(true)
+    db.prepare("DELETE FROM money_ledger WHERE id = 'ml_comp_bad_amount'").run()
+
+    closeDatabase(context)
+    rmSync(root, { recursive: true, force: true })
+  })
 })

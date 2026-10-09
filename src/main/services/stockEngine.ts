@@ -44,6 +44,33 @@ export type AppliedMovement = {
   revaluationRows: string[]
 }
 
+// The minimal movement identity `finalize` needs to normalise a product.
+type MovementContext = {
+  productId: string
+  userId: string
+  deviceId: string
+}
+
+// A void compensation row carries the exact negated qty/value produced by
+// `calculateVoidCompensation`. Unlike `applyMovement` it must NOT re-value the
+// movement at the current average, and it must NOT run the negative-stock
+// refusal (the domain already decided whether the compensation is legal).
+// It still participates in the ledger invariants, so an incoming compensation
+// that crosses stock from negative to >= 0 gets the negative-stock settlement
+// and every compensation is finished with `calculateStockNormalization`.
+export type CompensationMovementInput = {
+  productId: string
+  qtyDelta: number
+  valueDeltaPiasters: number
+  batchId?: string | null
+  referenceType?: string | null
+  referenceId?: string | null
+  reversesMovementId?: string | null
+  reason?: string | null
+  userId: string
+  deviceId: string
+}
+
 export function applyMovement(
   database: DatabaseHandle,
   dependencies: StockEngineDependencies,
@@ -127,28 +154,89 @@ export function applyMovement(
 function finalize(
   database: DatabaseHandle,
   dependencies: StockEngineDependencies,
-  movement: MovementInput,
+  context: MovementContext,
   movementId: string,
   costPiasters: number,
   revaluationRows: string[],
 ): ServiceResult<AppliedMovement> {
-  const onHand = getOnHand(database, movement.productId)
+  const onHand = getOnHand(database, context.productId)
   const normalized = calculateStockNormalization(onHand.qty, onHand.valuePiasters)
   if (!normalized.ok) return serviceErr(normalized.error.code, normalized.error)
   if (normalized.value.revaluationPiasters !== 0) {
     const now = dependencies.clock.now()
     const id = dependencies.ids.next()
     insertStockMovement(database, {
-      id, productId: movement.productId, qtyDelta: 0, valueDeltaPiasters: normalized.value.revaluationPiasters,
+      id, productId: context.productId, qtyDelta: 0, valueDeltaPiasters: normalized.value.revaluationPiasters,
       movementType: 'revaluation', occurredAt: now, reason: 'stock_normalization',
-      createdByUserId: movement.userId, createdAt: now, updatedAt: now, deviceId: movement.deviceId,
+      createdByUserId: context.userId, createdAt: now, updatedAt: now, deviceId: context.deviceId,
     })
     revaluationRows.push(id)
   }
-  const final = getOnHand(database, movement.productId)
+  const final = getOnHand(database, context.productId)
   if (final.qty === 0 && final.valuePiasters !== 0) return serviceErr('ledger_invariant_violation')
   if (final.qty > 0 && final.valuePiasters < 0) return serviceErr('ledger_invariant_violation')
   return serviceOk({ movementId, costPiasters, revaluationRows })
+}
+
+export function applyCompensationMovement(
+  database: DatabaseHandle,
+  dependencies: StockEngineDependencies,
+  movement: CompensationMovementInput,
+): ServiceResult<AppliedMovement> {
+  try {
+    const product = getProduct(database, movement.productId)
+    if (product === undefined) return serviceErr('not_found', { productId: movement.productId })
+    const onHand = getOnHand(database, movement.productId)
+    const now = dependencies.clock.now()
+    const value = movement.valueDeltaPiasters
+    const context: MovementContext = { productId: movement.productId, userId: movement.userId, deviceId: movement.deviceId }
+    const revaluationRows: string[] = []
+    const insertCompensation = (): string => {
+      const movementId = dependencies.ids.next()
+      insertStockMovement(database, {
+        id: movementId,
+        productId: movement.productId,
+        batchId: movement.batchId ?? null,
+        qtyDelta: movement.qtyDelta,
+        valueDeltaPiasters: value,
+        movementType: 'void_compensation',
+        reversesMovementId: movement.reversesMovementId ?? null,
+        referenceType: movement.referenceType ?? null,
+        referenceId: movement.referenceId ?? null,
+        occurredAt: now,
+        reason: movement.reason ?? null,
+        createdByUserId: movement.userId,
+        createdAt: now,
+        updatedAt: now,
+        deviceId: movement.deviceId,
+      })
+      dependencies.faults?.after('stock.movement_inserted')
+      return movementId
+    }
+
+    if (movement.qtyDelta > 0) {
+      // Restocking a reversed sale/return: settle when it lifts stock out of negative.
+      const settlement = calculateNegativeStockSettlement(onHand.qty, onHand.valuePiasters, movement.qtyDelta, value)
+      if (!settlement.ok) return serviceErr(settlement.error.code, settlement.error)
+      const movementId = insertCompensation()
+      if (settlement.value.revaluationPiasters !== 0) {
+        const id = dependencies.ids.next()
+        insertStockMovement(database, {
+          id, productId: movement.productId, qtyDelta: 0, valueDeltaPiasters: settlement.value.revaluationPiasters,
+          movementType: 'revaluation', occurredAt: now, reason: 'negative_stock_settlement',
+          createdByUserId: movement.userId, createdAt: now, updatedAt: now, deviceId: movement.deviceId,
+        })
+        revaluationRows.push(id)
+      }
+      return finalize(database, dependencies, context, movementId, value, revaluationRows)
+    }
+
+    // Removing purchased/restocked quantity: no settlement, only normalization.
+    const movementId = insertCompensation()
+    return finalize(database, dependencies, context, movementId, value, revaluationRows)
+  } catch (error) {
+    return serviceErr('database_error', error)
+  }
 }
 
 export function allocateBatches(
