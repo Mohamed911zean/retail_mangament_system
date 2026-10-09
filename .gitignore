@@ -40,3 +40,5 @@ installed-launch.stderr.log
 .dev-data
 repo-snapshot.txt
 state-at-stop.txt
+claude-context.txt
+reminder_prompt.md
