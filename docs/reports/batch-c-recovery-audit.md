@@ -151,3 +151,50 @@ The following commands were executed immediately upon taking over:
 151: | **R5** | C9 Integration | Failure-injection suite across named steps + Seeded Scenario Test (>=300 operations with `verifyDatabase` after each). |
 152: | **R6** | C10 Docs & Bundle | Complete `docs/services.md`, `DECISIONS.md`, `docs/database.md` error table, `docs/reports/batch-c-review-bundle.md`, and tag `phase1-services-green`. |
 
+---
+
+## 7. Round 3 Completion (R3–R5)
+
+- **Session baseline:** `e325b1b` ("fix(services): sale_return restock movement referenceId must be item ID not header ID"), 36 files / 215 tests green.
+- **Final status:** `npm run lint` PASS (0/0), `npm test` PASS (40 files / 234 tests), `npm run build` PASS.
+
+### R3 — VoidService (C8 void orchestration)
+
+- Implemented `src/main/services/voids.ts`: `voidSale`, `voidPurchase`, `voidSaleReturn`, `voidExpense`. Compensation math delegated to `src/domain/voids.ts` (`calculateVoidCompensation`); stock compensation rows written via raw `insertStockMovement` with the exact negated qty/value from the domain result (per DECISIONS.md, `void_compensation` bypasses `applyMovement`); money compensation via `insertMoneyLedgerEntry`; all steps inside one `runInTransaction`; full after-state audit snapshots.
+- **db-verify reconciliation (design decision):** three verifier rules conflicted with the frozen schema's designated reversal representation and were corrected so a properly voided document verifies green:
+  1. `document_stock_mismatch` / `purchase_stock_mismatch` now sum only the document's own movement types (`sale`, `purchase`), excluding `void_compensation` rows that carry `reference_type/reference_id` of the voided document.
+  2. `document_ledger_mismatch` / `purchase_ledger_mismatch` already exclude `void_compensation` entry types (unchanged).
+  3. `reversal_metadata_mismatch` now accepts the schema-designated `entry_type = 'void_compensation'` for reversal entries while still requiring `payment_method`, `customer_id`, and `supplier_id` to match the reversed entry. The pre-existing corruption fixture (same entry type, mismatched payment method) still fails as required.
+- `voidSaleReturn` passes `documentType: 'sale'` to `calculateVoidCompensation` so a return void behaves like a sale void (no stock negative-check, no return-block check); compensation references the `sale_return` document itself.
+- Tests: `src/main/services/voids.test.ts` — 7 tests: voidSale happy path (status/stock/money reversal + verify), blocked by completed returns (`void_blocked_by_returns`), already voided (`document_already_voided`), voidPurchase negative-stock block with `allowNegativeStock=false` (`insufficient_stock`, document untouched), voidPurchase happy path, voidSaleReturn happy path (validates the `reference_id = sale_return_items.id` fix), voidExpense happy path.
+
+### R4 — ShiftService (C7)
+
+- Implemented `src/main/services/shifts.ts`: `openShift`, `closeShift`, `recordExpense`, `recordCashIn`, `recordCashOut`, `getOpenShift`.
+  - One open shift per device enforced via `getOpenShift(database, deviceId)` before insert.
+  - `closeShift` computes expected cash with `calculateExpectedShiftCash` over all money-ledger rows for the shift, reconciles via `reconcileShiftCash`, persists expected/counted/difference, writes audit.
+  - `recordExpense` writes the expense row + `expense`/`out` money-ledger entry in one transaction. Cash moves write `cash_in`/`cash_out` ledger entries with `payment_method='cash'`.
+  - All mutations rejected with `invalid_shift_state` when the shift is not open; amounts validated as positive safe integers (`invalid_money`).
+- Tests: `src/main/services/shifts.test.ts` — 6 tests: open + single-open-shift guard, balanced close with hand-checked arithmetic (1000 + 300 − 250 = 1050), short reconciliation (−50), closed-shift guards for close/expense/cash-in, expense + ledger atomicity with non-cash expense excluded from expected cash (2000 − 750 = 1250 balanced), invalid amounts.
+
+### R5 — Integration & failure injection (C9)
+
+- `src/main/services/scenario.test.ts`: seeded PRNG (mulberry32, fixed seed) driving **320 mixed operations** — purchases, sales, returns, voidSale, voidSaleReturn, expenses, voidExpense, cash in/out, shift close/reopen cycles — against a single database, calling `verifyDatabase` after **every** operation. Eligibility tracking ensures invariants are respected (no void of sales with completed returns, no voids posting compensation into already-closed shifts, no overselling). Post-loop assertions confirm every operation family actually executed (>20 sales, >5 returns, >=1 voided sale, >=1 voided return, >10 expenses, >1 shift cycle).
+- `src/main/services/failure-injection.test.ts`: throws at every named in-transaction fault step and proves full rollback plus continued service usability:
+  - `voidSale` at `void.sale.start`, `void.sale.stock_written`, `void.sale.money_written`, `void.sale.status_updated` — sale stays `completed`, zero compensation rows, verifier green, retry succeeds.
+  - `openShift` at `shift.row_inserted` — no shift row survives.
+  - `closeShift` at `shift.row_closed` — shift stays open, no `closed_at`.
+  - `recordExpense` at `shift.expense_ledger_inserted` — neither expense nor ledger row survives.
+  - `recordCashIn` at `shift.cash_in_inserted` — no ledger row survives.
+
+### R6 — Documentation
+
+- `docs/services.md` created with entries for all application services (VoidService and ShiftService in detail).
+- `docs/reports/batch-c-review-bundle.md` created.
+- **Deferred (environment):** Git is not installed on the build machine. Conventional commits for R3–R6 and the `phase1-services-green` tag are prepared as pending working-tree changes and must be committed once Git is available, in this order:
+  1. `feat(services): VoidService — voidSale, voidPurchase, voidSaleReturn, voidExpense`
+  2. `test(services): VoidService test coverage` (includes db-verify compensation-row reconciliation)
+  3. `feat(services): ShiftService`
+  4. `test(services): seeded scenario and failure-injection suites`
+  5. `docs(report): batch C review bundle` + `git tag phase1-services-green`
+

@@ -38,3 +38,5 @@ installed-launch.stderr.log
 .verify-fixed-asar
 
 .dev-data
+repo-snapshot.txt
+state-at-stop.txt
