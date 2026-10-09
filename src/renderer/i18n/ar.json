@@ -68,7 +68,10 @@
     "invalid_payment_allocation": "توزيع الدفعات غير صالح",
     "stock_count_not_draft": "لا يمكن تعديل عدّة مخزون بعد نشرها",
     "expense_invalid_amount": "قيمة المصروف يجب أن تكون أكبر من صفر",
-    "product_has_stock": "لا يمكن حذف منتج يوجد له مخزون"
+    "product_has_stock": "لا يمكن حذف منتج يوجد له مخزون",
+    "credit_limit_exceeded": "تجاوزت الحد الائتماني للعميل، سجّل دفعة أو اطلب موافقة المدير",
+    "reversal_already_exists": "تم عكس هذه العملية مسبقاً",
+    "invalid_reversal_target": "لا يمكن عكس هذه العملية"
   },
   "backup": {
     "title": "النسخ الاحتياطي والاستعادة",

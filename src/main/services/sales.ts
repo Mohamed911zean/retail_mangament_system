@@ -6,7 +6,8 @@ import { insertHeldSale, getHeldSale, listHeldSales, softDeleteHeldSale } from '
 import { nextSequenceNumber } from '../database/repositories/sequences'
 import { getProduct } from '../database/repositories/catalog'
 import { getCustomer } from '../database/repositories/customers'
-import type { SaleRow, SaleItemRow } from '../database/rows'
+import { getCustomerBalance as loadCustomerBalance } from '../database/repositories/balances'
+import type { CustomerRow, SaleRow, SaleItemRow } from '../database/rows'
 import { calculateLineAmounts, type LineInput } from '../../domain/lineAmounts'
 import { calculateSaleTotals } from '../../domain/saleTotals'
 import { calculatePaymentAllocation, type Tender } from '../../domain/payments'
@@ -69,8 +70,9 @@ export class SaleService {
   async completeSale(actor: Actor, input: CompleteSaleInput): Promise<ServiceResult<SaleResult>> {
     try {
       // Validate customer exists if provided
+      let customer: CustomerRow | undefined
       if (input.customerId) {
-        const customer = getCustomer(this.deps.database, input.customerId)
+        customer = getCustomer(this.deps.database, input.customerId)
         if (customer === undefined) return serviceErr('not_found', { field: 'customerId' })
       }
 
@@ -108,6 +110,28 @@ export class SaleService {
 
       const paymentResult = calculatePaymentAllocation(totalsResult.value.total, input.tenders, !!input.customerId)
       if (!paymentResult.ok) return serviceErr(paymentResult.error.code, paymentResult.error)
+
+      // Enforce the customer credit limit against the receipt-aware derived balance:
+      // the projected balance is the current balance plus this sale's unpaid part, so a
+      // later receipt frees credit again. A positive limit is mandatory; NULL is unlimited
+      // and 0 means no credit. Managers/owners may override (audited).
+      let creditOverride = false
+      if (input.customerId !== undefined && input.customerId !== null && customer !== undefined && customer.creditLimitPiasters !== null && paymentResult.value.duePiasters > 0) {
+        const balanceResult = loadCustomerBalance(this.deps.database, input.customerId)
+        if (!balanceResult.ok) return serviceErr(balanceResult.error.code, balanceResult.error)
+        const projectedBalance = balanceResult.value.balancePiasters + paymentResult.value.duePiasters
+        if (projectedBalance > customer.creditLimitPiasters) {
+          const override = assertPermission(actor, 'sale.credit_override')
+          if (!override.ok) {
+            return serviceErr('credit_limit_exceeded', {
+              balancePiasters: balanceResult.value.balancePiasters,
+              duePiasters: paymentResult.value.duePiasters,
+              creditLimitPiasters: customer.creditLimitPiasters,
+            })
+          }
+          creditOverride = true
+        }
+      }
 
       const now = this.deps.clock.now()
       const saleId = this.ids.next()
@@ -213,7 +237,7 @@ export class SaleService {
 
         writeAudit(tx, this.ids, {
           userId: actor.userId, action: 'sale_completed', entityType: 'sale', entityId: saleId,
-          after: { invoiceNumber, total: totalsResult.value.total, status: paymentResult.value.status },
+          after: { invoiceNumber, total: totalsResult.value.total, status: paymentResult.value.status, ...(creditOverride ? { creditOverride: true } : {}) },
           now, deviceId: this.deps.deviceId,
         })
         this.faults.after('sale.audited')

@@ -18,6 +18,11 @@ export function listMoneyLedgerByReference(database: DatabaseHandle, referenceTy
   return mapRows<MoneyLedgerRow>(rows as Record<string, unknown>[])
 }
 
+export function findReversalOfEntry(database: DatabaseHandle, entryId: string): MoneyLedgerRow | undefined {
+  const row = execute(() => database.prepare('SELECT * FROM money_ledger WHERE reverses_entry_id = ?').get(entryId)) as Record<string, unknown> | undefined
+  return row === undefined ? undefined : mapRow<MoneyLedgerRow>(row)
+}
+
 export function insertMoneyLedgerEntry(database: DatabaseHandle, row: Partial<MoneyLedgerRow>): void {
   execute(() => database.prepare(`
     INSERT INTO money_ledger (id,entry_type,direction,amount_piasters,payment_method,customer_id,supplier_id,sale_id,

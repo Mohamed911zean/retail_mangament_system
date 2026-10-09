@@ -4,6 +4,7 @@ import { serviceErr, serviceOk } from './result'
 export type PermissionCode =
   | 'sale.zero_price'
   | 'sale.expired_override'
+  | 'sale.credit_override'
   | 'stock.negative_override'
   | 'cash.manual_move'
   | 'document.void'
@@ -15,6 +16,7 @@ export type Actor = { userId: string; role: 'owner' | 'manager' | 'cashier' }
 const allPermissions: readonly PermissionCode[] = [
   'sale.zero_price',
   'sale.expired_override',
+  'sale.credit_override',
   'stock.negative_override',
   'cash.manual_move',
   'document.void',

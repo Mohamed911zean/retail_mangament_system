@@ -8,6 +8,7 @@ import { PurchaseService } from './purchases'
 import { SaleReturnService } from './saleReturns'
 import { VoidService } from './voids'
 import { ShiftService } from './shifts'
+import { PaymentService } from './payments'
 import { verifyDatabase } from '../database/db-verify'
 import type { Clock } from './clock'
 import type { IdGenerator } from './ids'
@@ -35,6 +36,7 @@ function mulberry32(seed: number): () => number {
 type SaleRecord = { saleId: string; itemId: string; productId: string; qty: number; returned: number; shiftId: string; voided: boolean }
 type ReturnRecord = { returnId: string; saleIndex: number; qty: number; shiftId: string; voided: boolean }
 type ExpenseRecord = { expenseId: string; shiftId: string; voided: boolean }
+type LedgerRecord = { entryId: string; shiftId: string; reversed: boolean }
 
 const PRODUCTS = ['p1', 'p2', 'p3'] as const
 const SELL_PRICE = 150
@@ -72,11 +74,14 @@ describe('integration scenario (C9)', () => {
     const returns = new SaleReturnService(deps)
     const voids = new VoidService(deps)
     const shifts = new ShiftService(deps)
+    const payments = new PaymentService({ ...deps, shiftsEnabled: true })
 
     const rng = mulberry32(20261009)
     const salesPool: SaleRecord[] = []
     const returnsPool: ReturnRecord[] = []
     const expensesPool: ExpenseRecord[] = []
+    const receiptsPool: LedgerRecord[] = []
+    const supplierPaymentsPool: LedgerRecord[] = []
 
     const opened = await shifts.openShift(cashier, { openingCashPiasters: 5000 })
     if (!opened.ok) throw new Error('failed to open shift')
@@ -209,18 +214,60 @@ describe('integration scenario (C9)', () => {
       return 'shiftCycle'
     }
 
+    const doCustomerReceipt = async (opIndex: number) => {
+      const amount = 100 + Math.floor(rng() * 900)
+      const method = rng() < 0.7 ? 'cash' : 'card'
+      const result = await payments.recordCustomerReceipt(cashier, { customerId: 'c1', amountPiasters: amount, method })
+      if (!result.ok) throw new Error(`receipt failed at op ${opIndex}: ${JSON.stringify(result.error)}`)
+      receiptsPool.push({ entryId: result.value.id, shiftId: currentShiftId, reversed: false })
+      return `customerReceipt:${method}`
+    }
+
+    const doSupplierPayment = async (opIndex: number) => {
+      const amount = 100 + Math.floor(rng() * 900)
+      const method = rng() < 0.7 ? 'cash' : 'wallet'
+      const result = await payments.recordSupplierPayment(manager, { supplierId: 's1', amountPiasters: amount, method })
+      if (!result.ok) throw new Error(`supplier payment failed at op ${opIndex}: ${JSON.stringify(result.error)}`)
+      supplierPaymentsPool.push({ entryId: result.value.id, shiftId: currentShiftId, reversed: false })
+      return `supplierPayment:${method}`
+    }
+
+    const doReverseReceipt = async () => {
+      const candidates = receiptsPool.filter((r) => !r.reversed && r.shiftId === currentShiftId)
+      if (candidates.length === 0) return 'reverseReceipt:skipped'
+      const record = candidates[Math.floor(rng() * candidates.length)]
+      const result = await payments.reverseCustomerReceipt(manager, { entryId: record.entryId, reason: 'scenario reversal' })
+      if (!result.ok) return `reverseReceipt:rejected:${result.error.code}`
+      record.reversed = true
+      return 'reverseReceipt'
+    }
+
+    const doReverseSupplierPayment = async () => {
+      const candidates = supplierPaymentsPool.filter((r) => !r.reversed && r.shiftId === currentShiftId)
+      if (candidates.length === 0) return 'reverseSupplierPayment:skipped'
+      const record = candidates[Math.floor(rng() * candidates.length)]
+      const result = await payments.reverseSupplierPayment(manager, { entryId: record.entryId, reason: 'scenario reversal' })
+      if (!result.ok) return `reverseSupplierPayment:rejected:${result.error.code}`
+      record.reversed = true
+      return 'reverseSupplierPayment'
+    }
+
     let fallbackSkips = 0
     for (let i = 0; i < 320; i++) {
       const roll = Math.floor(rng() * 100)
       let opName: string
-      if (roll < 25) opName = await doSale(i)
-      else if (roll < 45) opName = await doPurchase(i)
-      else if (roll < 58) opName = await doReturn(i)
-      else if (roll < 68) opName = await doVoidSale(i)
-      else if (roll < 76) opName = await doVoidReturn()
-      else if (roll < 86) opName = await doExpense(i)
-      else if (roll < 91) opName = await doVoidExpense()
-      else if (roll < 96) opName = await doCashMove(i)
+      if (roll < 22) opName = await doSale(i)
+      else if (roll < 40) opName = await doPurchase(i)
+      else if (roll < 51) opName = await doReturn(i)
+      else if (roll < 60) opName = await doVoidSale(i)
+      else if (roll < 67) opName = await doVoidReturn()
+      else if (roll < 74) opName = await doExpense(i)
+      else if (roll < 78) opName = await doVoidExpense()
+      else if (roll < 82) opName = await doCashMove(i)
+      else if (roll < 86) opName = await doCustomerReceipt(i)
+      else if (roll < 89) opName = await doSupplierPayment(i)
+      else if (roll < 92) opName = await doReverseReceipt()
+      else if (roll < 95) opName = await doReverseSupplierPayment()
       else opName = await doCloseReopenShift(i)
 
       if (opName.endsWith(':skipped')) fallbackSkips += 1
@@ -233,8 +280,12 @@ describe('integration scenario (C9)', () => {
     expect(salesPool.some((s) => s.voided)).toBe(true)
     expect(returnsPool.some((r) => r.voided)).toBe(true)
     expect(expensesPool.length).toBeGreaterThan(10)
+    expect(receiptsPool.length).toBeGreaterThan(5)
+    expect(supplierPaymentsPool.length).toBeGreaterThan(3)
+    expect(receiptsPool.some((r) => r.reversed)).toBe(true)
+    expect(supplierPaymentsPool.some((r) => r.reversed)).toBe(true)
     expect(shiftCount).toBeGreaterThan(1)
-    expect(fallbackSkips).toBeLessThan(60)
+    expect(fallbackSkips).toBeLessThan(80)
 
     const finalVerify = verifyDatabase(context.database)
     expect(finalVerify.ok).toBe(true)
