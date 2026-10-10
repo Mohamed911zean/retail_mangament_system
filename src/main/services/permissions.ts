@@ -1,34 +1,13 @@
+import type { Actor, PermissionCode } from '../../shared/permissions'
+import { rolePermissions } from '../../shared/permissions'
 import type { ServiceResult } from './result'
 import { serviceErr, serviceOk } from './result'
 
-export type PermissionCode =
-  | 'sale.zero_price'
-  | 'sale.expired_override'
-  | 'sale.credit_override'
-  | 'stock.negative_override'
-  | 'cash.manual_move'
-  | 'document.void'
-  | 'product.price_change'
-  | 'product.cost_change'
-
-export type Actor = { userId: string; role: 'owner' | 'manager' | 'cashier' }
-
-const allPermissions: readonly PermissionCode[] = [
-  'sale.zero_price',
-  'sale.expired_override',
-  'sale.credit_override',
-  'stock.negative_override',
-  'cash.manual_move',
-  'document.void',
-  'product.price_change',
-  'product.cost_change',
-]
-
-export const rolePermissions: Record<Actor['role'], readonly PermissionCode[]> = {
-  owner: allPermissions,
-  manager: allPermissions,
-  cashier: [],
-}
+// The permission table and the actor contract live in `src/shared/permissions.ts`
+// so the renderer can hide what a role cannot use. Enforcement always happens
+// here, in the main process.
+export type { Actor, PermissionCode }
+export { rolePermissions }
 
 export function assertPermission(actor: Actor, permission: PermissionCode): ServiceResult<true> {
   return rolePermissions[actor.role].includes(permission)

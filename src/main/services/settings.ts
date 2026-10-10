@@ -9,30 +9,45 @@ import { serviceErr, serviceOk } from './result'
 import { writeAudit } from './audit'
 import { noFaults, type FaultInjector } from './fault-injector'
 
-export type Settings = {
-  shifts: boolean
-  expiry_batches: boolean
-  weighted_items: boolean
-  customer_credit: boolean
-  tax: boolean
-  allow_negative_stock: boolean
-  payment_methods: readonly ('cash' | 'card' | 'wallet')[]
-  cash_rounding_step_piasters: number
-  device_id: string
-}
+import type { Settings } from '../../shared/settings'
+import { defaultSettings } from '../../shared/settings'
 
-const defaults: Omit<Settings, 'device_id'> = {
-  shifts: true,
-  expiry_batches: false,
-  weighted_items: true,
-  customer_credit: true,
-  tax: false,
-  allow_negative_stock: true,
-  payment_methods: ['cash', 'card', 'wallet'],
-  cash_rounding_step_piasters: 0,
-}
+export type { Settings }
+
+const defaults = defaultSettings
 
 type SettingsDependencies = { database: DatabaseHandle; clock: Clock; ids?: IdGenerator; deviceId?: string; faults?: FaultInjector }
+
+/** Reads the stored `device_id`, creating and persisting one on first use. */
+export function resolveDeviceId(database: DatabaseHandle, ids: IdGenerator, now: number): string {
+  const existing = getSetting(database, 'device_id')
+  if (existing !== undefined) return existing.value
+  const deviceId = ids.next()
+  upsertSetting(database, {
+    key: 'device_id',
+    value: deviceId,
+    valueType: 'string',
+    description: 'Device identifier',
+    createdAt: now,
+    updatedAt: now,
+    deviceId,
+  })
+  return deviceId
+}
+
+/**
+ * Synchronous settings snapshot used to configure services at construction
+ * time (negative-stock policy, shift feature flag). It reads the same rows and
+ * the same defaults as `SettingsService.get()`, so the two cannot disagree.
+ */
+export function resolveSettingsSync(database: DatabaseHandle, ids: IdGenerator, now: number, deviceId?: string): Settings {
+  const values = { ...defaults }
+  for (const key of Object.keys(defaults) as (keyof typeof defaults)[]) {
+    const row = getSetting(database, key)
+    if (row !== undefined) values[key] = JSON.parse(row.value) as never
+  }
+  return { ...values, device_id: deviceId ?? resolveDeviceId(database, ids, now) }
+}
 
 export class SettingsService {
   private readonly ids: IdGenerator
@@ -42,24 +57,13 @@ export class SettingsService {
 
   async get(): Promise<ServiceResult<Settings>> {
     try {
-      const values = { ...defaults }
-      for (const key of Object.keys(defaults) as (keyof typeof defaults)[]) {
-        const row = getSetting(this.dependencies.database, key)
-        if (row !== undefined) values[key] = JSON.parse(row.value) as never
-      }
-      const deviceId = this.dependencies.deviceId ?? getSetting(this.dependencies.database, 'device_id')?.value ?? this.ids.next()
-      if (getSetting(this.dependencies.database, 'device_id') === undefined) {
-        upsertSetting(this.dependencies.database, {
-          key: 'device_id',
-          value: deviceId,
-          valueType: 'string',
-          description: 'Device identifier',
-          createdAt: this.dependencies.clock.now(),
-          updatedAt: this.dependencies.clock.now(),
-          deviceId,
-        })
-      }
-      return serviceOk({ ...values, device_id: deviceId })
+      const settings = resolveSettingsSync(
+        this.dependencies.database,
+        this.ids,
+        this.dependencies.clock.now(),
+        this.dependencies.deviceId,
+      )
+      return serviceOk(settings)
     } catch (error) {
       return serviceErr('settings_error', error)
     }

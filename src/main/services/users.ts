@@ -12,14 +12,9 @@ import type { Actor } from './permissions'
 import { serviceErr, serviceOk, type ServiceResult } from './result'
 import { writeAudit } from './audit'
 
-export type PublicUser = {
-  id: string
-  username: string
-  displayName: string
-  role: 'owner' | 'manager' | 'cashier'
-  isActive: boolean
-  lastLoginAt: number | null
-}
+import type { PublicUser } from '../../shared/ipc'
+
+export type { PublicUser }
 
 export type LoginResult = {
   user: PublicUser
@@ -76,6 +71,41 @@ export class UserService {
       updateUser(this.deps.database, row.id, { lastLoginAt: now, updatedAt: now })
       const sessionToken = generateSessionToken()
       return serviceOk({ user: toPublic(row), sessionToken })
+    } catch (error) {
+      return serviceErr('database_error', error)
+    }
+  }
+
+  /**
+   * First-run bootstrap: creates the shop owner. Allowed only while the device
+   * has no users at all, so it can never be used to escalate later. The audit
+   * row has no acting user (there is none yet), which `audit_log.user_id`
+   * allows because it is nullable with a foreign key to `users`.
+   */
+  async bootstrapOwner(fields: { username: string; displayName: string; password: string }): Promise<ServiceResult<PublicUser>> {
+    try {
+      if (listUsers(this.deps.database).length > 0) return serviceErr('setup_already_completed')
+      const username = fields.username.trim()
+      const displayName = fields.displayName.trim() || username
+      if (username.length === 0) return serviceErr('invalid_input', { field: 'username' })
+      if (fields.password.length < 4) return serviceErr('invalid_input', { field: 'password' })
+      const now = this.deps.clock.now()
+      const id = this.ids.next()
+      runInTransaction(this.deps.database, (tx) => {
+        insertUser(tx, {
+          id, username, displayName, passwordHash: hashPassword(fields.password),
+          role: 'owner', isActive: true, lastLoginAt: null,
+          createdAt: now, updatedAt: now, deviceId: this.deps.deviceId,
+        })
+        writeAudit(tx, this.ids, {
+          userId: null, action: 'owner_bootstrapped', entityType: 'user', entityId: id,
+          after: { id, username, displayName, role: 'owner' }, now, deviceId: this.deps.deviceId,
+        })
+        this.faults.after('user.owner_bootstrapped')
+      })
+      const row = getUser(this.deps.database, id)
+      if (row === undefined) return serviceErr('database_error')
+      return serviceOk(toPublic(row))
     } catch (error) {
       return serviceErr('database_error', error)
     }

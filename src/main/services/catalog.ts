@@ -8,6 +8,7 @@ import {
 } from '../database/repositories/catalog'
 import { getOnHand } from '../database/repositories/stock'
 import type { CategoryRow, ProductRow, BarcodeRow, ProductUnitRow } from '../database/rows'
+import type { ProductSummary } from '../../shared/ipc'
 import type { Clock } from './clock'
 import type { FaultInjector } from './fault-injector'
 import { noFaults } from './fault-injector'
@@ -228,6 +229,45 @@ export class CatalogService {
       const product = getProduct(this.deps.database, barcodeRow.productId)
       if (product === undefined) return serviceErr('not_found')
       return serviceOk({ product, barcode: barcodeRow })
+    } catch (e) { return serviceErr('database_error', e) }
+  }
+
+  // ─── Renderer-facing summaries ─────────────────────────────────────────────
+
+  // The POS screen needs on-hand stock, units and barcodes next to the product
+  // row. Composing them here (and not in `ipc/`) keeps the layering rule:
+  // ipc -> services -> repositories.
+
+  private summarize(rows: ProductRow[]): ProductSummary[] {
+    return rows.map((row) => {
+      const onHand = getOnHand(this.deps.database, row.id)
+      return {
+        ...row,
+        onHandQty: onHand.qty,
+        onHandValuePiasters: onHand.valuePiasters,
+        units: listProductUnits(this.deps.database, row.id),
+        barcodes: listBarcodes(this.deps.database, row.id).map((barcode) => barcode.barcode),
+      }
+    })
+  }
+
+  async listProductSummaries(): Promise<ServiceResult<ProductSummary[]>> {
+    try { return serviceOk(this.summarize(listProducts(this.deps.database))) } catch (e) { return serviceErr('database_error', e) }
+  }
+
+  async getProductSummary(id: string): Promise<ServiceResult<ProductSummary>> {
+    try {
+      const row = getProduct(this.deps.database, id)
+      if (row === undefined) return serviceErr('not_found', { productId: id })
+      return serviceOk(this.summarize([row])[0])
+    } catch (e) { return serviceErr('database_error', e) }
+  }
+
+  async lookupBarcodeSummary(barcode: string): Promise<ServiceResult<ProductSummary>> {
+    try {
+      const barcodeRow = getBarcode(this.deps.database, barcode)
+      if (barcodeRow === undefined) return serviceErr('not_found', { barcode })
+      return this.getProductSummary(barcodeRow.productId)
     } catch (e) { return serviceErr('database_error', e) }
   }
 }
