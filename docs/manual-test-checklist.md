@@ -131,3 +131,38 @@ one below. Make a credit/POS sale against them to see a balance.
 ### NOT verified by the AI in the real GUI
 - RTL layout of the list and both dialogs at 1280×720 and 1366×768.
 - Full keyboard flow (Tab order, Esc, Enter-to-save).
+
+## Screen 4 — Inventory (`b34531b`, IPC `755121b`)
+
+Setup: log in as owner/manager. Seed products with stock (via purchases),
+one below its low-stock threshold, one with trackExpiry and a dated batch.
+
+### Stock tab (الأرصدة)
+- [ ] Table shows every product with on-hand quantity and value, plus the
+      total stock value card.
+- [ ] Search filters by name/SKU/barcode; "منخفض" shows low + out-of-stock;
+      "يحتاج مراجعة" shows negative and zero-value rows only.
+- [ ] Badges: "نافد" (zero), "منخفض" (at/below threshold), "سالب" (negative),
+      "يحتاج مراجعة" (positive qty, no value).
+- [ ] "تسوية": pick زيادة/نقص, quantity, reason → toast "تم حفظ التسوية",
+      row updates. Empty reason or zero quantity is blocked inline.
+- [ ] "تالف": quantity + reason → toast "تم تسجيل التالف", stock drops.
+- [ ] Cashier role: no adjust/damage buttons.
+
+### Counts tab (الجرد)
+- [ ] "جرد جديد": notes + "بدء الجرد" opens a draft.
+- [ ] Add lines: product picker (already-counted products excluded), expected
+      shown from the ledger, counted typed → row with signed difference.
+- [ ] "ترحيل الجرد" asks twice (yes/no); toast "تم ترحيل الجرد"; badge
+      becomes "مرحّل"; stock tab reflects the differences.
+- [ ] Posting with no lines is disabled. Reopening a posted count is read-only.
+- [ ] Cashier role: no "جرد جديد"; drafts cannot be opened for editing.
+
+### Expiry tab (الصلاحية, only with `features.expiry_batches`)
+- [ ] Lists batches with expiry, earliest first; expired rows "منتهية",
+      within-30-days rows "قريبة الانتهاء".
+- [ ] Tab hidden when the feature is off.
+
+### NOT verified by the AI in the real GUI
+- RTL layout of all tabs and dialogs at 1280×720 and 1366×768.
+- Full keyboard flow. Expiry "now" is page-load time (badges refresh on reload).
