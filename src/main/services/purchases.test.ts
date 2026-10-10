@@ -204,4 +204,49 @@ describe('PurchaseService.receivePurchase', () => {
     closeDatabase(context)
     rmSync(root, { recursive: true, force: true })
   })
+
+  it('lists purchases for all suppliers and per supplier', async () => {
+    const root = join(tmpdir(), `small-shop-pos-pur-list-${Date.now()}`)
+    mkdirSync(root, { recursive: true })
+    const context = await openDatabase(join(root, 'user-data'), join(process.cwd(), 'migrations'))
+    setupPurchaseDb(context.database)
+    const now = fixedClock.now()
+    context.database.exec(`
+      INSERT INTO suppliers (id,name,phone,address,metadata,created_at,updated_at,device_id)
+      VALUES ('sup2','Second Supplier',NULL,NULL,NULL,${now},${now},'d1');
+    `)
+
+    const service = new PurchaseService({
+      database: context.database,
+      clock: fixedClock,
+      ids: testIds(),
+      deviceId: 'd1',
+      allowNegativeStock: true,
+    })
+
+    for (const supplierId of ['sup1', 'sup2']) {
+      const received = await service.receivePurchase(managerActor, {
+        supplierId,
+        lines: [{ productId: 'p_milk', unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 2, unitCostPiasters: 100 }],
+        tenders: [],
+        taxEnabled: false,
+      })
+      expect(received.ok).toBe(true)
+    }
+
+    const all = await service.listPurchases()
+    expect(all.ok).toBe(true)
+    if (all.ok) expect(all.value.length).toBe(2)
+
+    const filtered = await service.listPurchases('sup2')
+    expect(filtered.ok).toBe(true)
+    if (filtered.ok) {
+      expect(filtered.value.length).toBe(1)
+      expect(filtered.value[0].supplierId).toBe('sup2')
+    }
+
+    expect(verifyDatabase(context.database).ok).toBe(true)
+    closeDatabase(context)
+    rmSync(root, { recursive: true, force: true })
+  })
 })

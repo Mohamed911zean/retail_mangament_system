@@ -19,10 +19,13 @@ import type {
   MoneyLedgerRow,
   ProductRow,
   ProductUnitRow,
+  PurchaseItemRow,
+  PurchaseRow,
   SaleItemRow,
   SaleRow,
   ShiftRow,
   StockMovementRow,
+  SupplierRow,
 } from './rows'
 
 // ─── Result envelope ────────────────────────────────────────────────────────
@@ -183,6 +186,39 @@ export type ReverseEntryInput = { entryId: string; reason?: string | null }
 export type UserCreateInput = { username: string; displayName: string; role: Role; password: string }
 export type UserUpdateInput = Partial<{ displayName: string; role: Role; isActive: boolean }>
 
+export type SupplierInput = {
+  name: string
+  phone?: string | null
+  address?: string | null
+}
+
+export type PurchaseTender = { method: PaymentMethod; amountPiasters: number }
+
+export type PurchaseLine = {
+  productId: string
+  unitNameSnapshot: string
+  /** Base-unit quantity covered by one priced unit (1 for counted goods). */
+  pricedUnitQtyBase: number
+  qtyBase: number
+  unitCostPiasters: number
+  taxRateBps?: number
+  batchCode?: string | null
+  /** UTC epoch milliseconds, or null when the batch has no expiry. */
+  expiryAt?: number | null
+  createBatch?: boolean
+}
+
+export type ReceivePurchaseInput = {
+  supplierId?: string | null
+  lines: PurchaseLine[]
+  tenders: PurchaseTender[]
+  taxEnabled: boolean
+}
+
+export type PurchaseDetails = { purchase: PurchaseRow; items: PurchaseItemRow[] }
+
+export type VoidDocumentInput = { documentId: string; reason: string }
+
 // ─── Channels ───────────────────────────────────────────────────────────────
 
 /** Every channel the preload is allowed to invoke. Nothing else is exposed. */
@@ -240,6 +276,20 @@ export const IPC_CHANNELS = [
 
   'inventory:on-hand',
   'inventory:list-movements',
+
+  'purchases:list',
+  'purchases:get',
+  'purchases:receive',
+
+  'suppliers:list',
+  'suppliers:create',
+  'suppliers:update',
+  'suppliers:delete',
+
+  'voids:void-sale',
+  'voids:void-purchase',
+  'voids:void-sale-return',
+  'voids:void-expense',
 
   'settings:get',
   'settings:set',
@@ -326,6 +376,23 @@ export type IpcApi = {
     onHand: (productId: string) => Promise<IpcResult<{ qty: number; valuePiasters: number }>>
     listMovements: (productId?: string) => Promise<IpcResult<StockMovementRow[]>>
   }
+  purchases: {
+    list: (supplierId?: string) => Promise<IpcResult<PurchaseRow[]>>
+    get: (purchaseId: string) => Promise<IpcResult<PurchaseDetails>>
+    receive: (input: ReceivePurchaseInput) => Promise<IpcResult<PurchaseDetails>>
+  }
+  suppliers: {
+    list: () => Promise<IpcResult<SupplierRow[]>>
+    create: (input: SupplierInput) => Promise<IpcResult<SupplierRow>>
+    update: (supplierId: string, input: Partial<SupplierInput>) => Promise<IpcResult<SupplierRow>>
+    delete: (supplierId: string) => Promise<IpcResult<true>>
+  }
+  voids: {
+    voidSale: (input: VoidDocumentInput) => Promise<IpcResult<{ id: string }>>
+    voidPurchase: (input: VoidDocumentInput) => Promise<IpcResult<{ id: string }>>
+    voidSaleReturn: (input: VoidDocumentInput) => Promise<IpcResult<{ id: string }>>
+    voidExpense: (input: VoidDocumentInput) => Promise<IpcResult<{ id: string }>>
+  }
   settings: {
     get: () => Promise<IpcResult<Settings>>
     set: (key: SettingsKey, value: Settings[SettingsKey]) => Promise<IpcResult<Settings>>
@@ -352,4 +419,4 @@ export type IpcApi = {
   }
 }
 
-export type { Settings, PaymentMethod, MoneyLedgerRow }
+export type { Settings, PaymentMethod, MoneyLedgerRow, PurchaseRow, PurchaseItemRow, SupplierRow }

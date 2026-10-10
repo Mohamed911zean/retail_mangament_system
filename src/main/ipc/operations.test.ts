@@ -462,3 +462,127 @@ describe('runOperation — a sale end to end over IPC', () => {
     expect(sale.sale.duePiasters).toBe(0)
   })
 })
+
+describe('runOperation — purchases, suppliers and voids over IPC', () => {
+  it('receives a purchase, lists it, reads it back and voids it', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    // Cash moves with shifts enabled live in the open shift — same as the app.
+    expectSuccess(await runOperation('shifts:open', { openingCashPiasters: 0 }, context))
+
+    const product = expectSuccess(
+      await runOperation(
+        'catalog:create-product',
+        { name: 'عدس', baseUnitName: 'piece', qtyScale: 0, costPricePiasters: 1000, sellingPricePiasters: 1500 },
+        context,
+      ),
+    ) as { id: string }
+
+    const supplier = expectSuccess(
+      await runOperation('suppliers:create', { name: 'مورد البقوليات', phone: '01001234567' }, context),
+    ) as { id: string }
+
+    // 10 pieces × 1000 = 10000; 5000 cash now, 5000 left as supplier balance.
+    const received = expectSuccess(
+      await runOperation(
+        'purchases:receive',
+        {
+          supplierId: supplier.id,
+          lines: [{ productId: product.id, unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 10, unitCostPiasters: 1000 }],
+          tenders: [{ method: 'cash', amountPiasters: 5000 }],
+          taxEnabled: false,
+        },
+        context,
+      ),
+    ) as {
+      purchase: { id: string; totalPiasters: number; paidPiasters: number; duePiasters: number; paymentStatus: string }
+      items: { qtyBase: number }[]
+    }
+    expect(received.purchase.totalPiasters).toBe(10_000)
+    expect(received.purchase.paidPiasters).toBe(5000)
+    expect(received.purchase.duePiasters).toBe(5000)
+    expect(received.purchase.paymentStatus).toBe('partial')
+    expect(received.items).toHaveLength(1)
+
+    const listed = expectSuccess(await runOperation('purchases:list', {}, context)) as { id: string }[]
+    expect(listed.map((row) => row.id)).toContain(received.purchase.id)
+
+    const filtered = expectSuccess(await runOperation('purchases:list', { supplierId: supplier.id }, context)) as { id: string }[]
+    expect(filtered).toHaveLength(1)
+
+    const readBack = expectSuccess(await runOperation('purchases:get', { purchaseId: received.purchase.id }, context)) as {
+      purchase: { id: string }
+      items: { qtyBase: number }[]
+    }
+    expect(readBack.items[0].qtyBase).toBe(10)
+
+    const balance = expectSuccess(await runOperation('payments:supplier-balance', { supplierId: supplier.id }, context)) as {
+      balancePiasters: number
+    }
+    expect(balance.balancePiasters).toBe(5000)
+
+    const voided = expectSuccess(
+      await runOperation('voids:void-purchase', { documentId: received.purchase.id, reason: 'خطأ في الكمية' }, context),
+    ) as { id: string }
+    expect(voided.id).toBe(received.purchase.id)
+
+    const afterVoid = expectSuccess(await runOperation('purchases:get', { purchaseId: received.purchase.id }, context)) as {
+      purchase: { status: string }
+    }
+    expect(afterVoid.purchase.status).toBe('voided')
+
+    const secondVoid = expectFailure(
+      await runOperation('voids:void-purchase', { documentId: received.purchase.id, reason: 'مرة أخرى' }, context),
+    )
+    expect(secondVoid.code).toBe('document_already_voided')
+  })
+
+  it('runs supplier create, rename and delete over IPC', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const created = expectSuccess(await runOperation('suppliers:create', { name: 'مورد' }, context)) as { id: string; name: string }
+    expect(created.name).toBe('مورد')
+
+    const renamed = expectSuccess(
+      await runOperation('suppliers:update', { supplierId: created.id, name: 'مورد جديد' }, context),
+    ) as { name: string }
+    expect(renamed.name).toBe('مورد جديد')
+
+    const listed = expectSuccess(await runOperation('suppliers:list', {}, context)) as { id: string }[]
+    expect(listed.map((row) => row.id)).toContain(created.id)
+
+    expectSuccess(await runOperation('suppliers:delete', { supplierId: created.id }, context))
+    const afterDelete = expectSuccess(await runOperation('suppliers:list', {}, context)) as { id: string }[]
+    expect(afterDelete.map((row) => row.id)).not.toContain(created.id)
+  })
+
+  it('refuses a void without a reason at the boundary', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const error = expectFailure(await runOperation('voids:void-purchase', { documentId: '01IPCREASON000000000001', reason: '' }, context))
+    expect(error.code).toBe('invalid_input')
+    expect(error.messageKey).toBe('errors.invalid_input')
+  })
+
+  it('points at the offending purchase line field', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const error = expectFailure(
+      await runOperation(
+        'purchases:receive',
+        {
+          supplierId: null,
+          lines: [{ productId: '01IPCBADLINE00000000001', unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 0, unitCostPiasters: 100 }],
+          tenders: [],
+          taxEnabled: false,
+        },
+        context,
+      ),
+    )
+    expect(error.code).toBe('invalid_input')
+  })
+})

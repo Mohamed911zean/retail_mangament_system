@@ -80,6 +80,40 @@ function parseSaleInput(payload: unknown) {
 
 type SalePayload = ReturnType<typeof parseSaleInput>
 
+function parsePurchaseLine(item: unknown, index: number) {
+  const line = v.payload(item)
+  const at = (field: string): string => `purchaseLines[${index}].${field}`
+  return {
+    productId: v.id(line.productId, at('productId')),
+    unitNameSnapshot: v.string(line.unitNameSnapshot, at('unitNameSnapshot'), { max: 64 }),
+    pricedUnitQtyBase: line.pricedUnitQtyBase === undefined ? 1 : v.integer(line.pricedUnitQtyBase, at('pricedUnitQtyBase'), { min: 1 }),
+    qtyBase: v.integer(line.qtyBase, at('qtyBase'), { min: 1 }),
+    unitCostPiasters: v.money(line.unitCostPiasters ?? 0, at('unitCostPiasters')),
+    taxRateBps: line.taxRateBps === undefined ? 0 : v.integer(line.taxRateBps, at('taxRateBps'), { min: 0, max: 100_000 }),
+    batchCode: v.optionalText(line.batchCode, at('batchCode'), { max: 64 }) ?? null,
+    expiryAt: line.expiryAt === undefined || line.expiryAt === null ? null : v.integer(line.expiryAt, at('expiryAt'), { min: 1 }),
+    createBatch: v.boolean(line.createBatch, at('createBatch'), false),
+  }
+}
+
+function parsePurchaseInput(payload: unknown) {
+  const input = v.payload(payload)
+  return {
+    supplierId: v.optionalId(input.supplierId, 'supplierId') ?? null,
+    lines: v.array(input.lines, 'lines', parsePurchaseLine, { min: 1, max: 200 }),
+    tenders: v.array(input.tenders ?? [], 'tenders', parseTender, { max: 8 }),
+    taxEnabled: v.boolean(input.taxEnabled, 'taxEnabled', false),
+  }
+}
+
+function parseVoidInput(payload: unknown) {
+  const input = v.payload(payload)
+  return {
+    documentId: v.id(input.documentId, 'documentId'),
+    reason: v.string(input.reason, 'reason', { max: 300 }),
+  }
+}
+
 /**
  * The wire format calls a percentage discount `percent`/`basisPoints`; the domain
  * calls the same thing `percentage`/`rateBps`. Translating in one place keeps the
@@ -595,6 +629,97 @@ export const operations: Record<IpcChannel, OperationSpec> = {
       const input = v.payload(payload)
       return context.services.inventory.listMovements(v.optionalId(input.productId, 'productId') ?? undefined)
     },
+  },
+
+  // ── Purchases ─────────────────────────────────────────────────────────────
+  'purchases:list': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.purchases.listPurchases(v.optionalId(input.supplierId, 'supplierId') ?? undefined)
+    },
+  },
+  'purchases:get': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.purchases.getPurchase(v.id(input.purchaseId, 'purchaseId'))
+    },
+  },
+  'purchases:receive': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) =>
+      context.services.purchases.receivePurchase(requireActor(context), parsePurchaseInput(payload)),
+  },
+
+  // ── Suppliers ─────────────────────────────────────────────────────────────
+  'suppliers:list': {
+    auth: true,
+    mutating: false,
+    handle: async (context) => context.services.suppliers.listSuppliers(),
+  },
+  'suppliers:create': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.suppliers.createSupplier(requireActor(context), {
+        name: v.string(input.name, 'name', { max: 200 }),
+        phone: v.optionalText(input.phone, 'phone', { max: 32 }) ?? null,
+        address: v.optionalText(input.address, 'address', { max: 300 }) ?? null,
+      })
+    },
+  },
+  'suppliers:update': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      const fields: { name?: string; phone?: string | null; address?: string | null } = {}
+      if (input.name !== undefined) fields.name = v.string(input.name, 'name', { max: 200 })
+      if (input.phone !== undefined) fields.phone = v.optionalText(input.phone, 'phone', { max: 32 }) ?? null
+      if (input.address !== undefined) fields.address = v.optionalText(input.address, 'address', { max: 300 }) ?? null
+      return context.services.suppliers.updateSupplier(requireActor(context), v.id(input.supplierId, 'supplierId'), fields)
+    },
+  },
+  'suppliers:delete': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.suppliers.deleteSupplier(requireActor(context), v.id(input.supplierId, 'supplierId'))
+    },
+  },
+
+  // ── Voids ─────────────────────────────────────────────────────────────────
+  // Every void is terminal and compensating: the document stays, and the stock
+  // and money effects are reversed in the current open shift (schema §5).
+  'voids:void-sale': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) =>
+      context.services.voids.voidSale(requireActor(context), parseVoidInput(payload)),
+  },
+  'voids:void-purchase': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) =>
+      context.services.voids.voidPurchase(requireActor(context), parseVoidInput(payload)),
+  },
+  'voids:void-sale-return': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) =>
+      context.services.voids.voidSaleReturn(requireActor(context), parseVoidInput(payload)),
+  },
+  'voids:void-expense': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) =>
+      context.services.voids.voidExpense(requireActor(context), parseVoidInput(payload)),
   },
 
   // ── Settings ──────────────────────────────────────────────────────────────

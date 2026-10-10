@@ -6,11 +6,14 @@ import type {
   IpcChannel,
   IpcResult,
   ProductInput,
+  ReceivePurchaseInput,
   ReverseEntryInput,
+  SupplierInput,
   SupplierPaymentInput,
   ReceiptInput,
   UserCreateInput,
   UserUpdateInput,
+  VoidDocumentInput,
 } from '../shared/ipc'
 import type { SettingsKey } from '../shared/settings'
 
@@ -97,6 +100,26 @@ const api: IpcApi = {
   inventory: {
     onHand: (productId: string) => invoke('inventory:on-hand', { productId }),
     listMovements: (productId?: string) => invoke('inventory:list-movements', { productId }),
+  },
+
+  purchases: {
+    list: (supplierId?: string) => invoke('purchases:list', { supplierId }),
+    get: (purchaseId: string) => invoke('purchases:get', { purchaseId }),
+    receive: (input: ReceivePurchaseInput) => invoke('purchases:receive', input),
+  },
+
+  suppliers: {
+    list: () => invoke('suppliers:list'),
+    create: (input: SupplierInput) => invoke('suppliers:create', input),
+    update: (supplierId: string, input: Partial<SupplierInput>) => invoke('suppliers:update', { supplierId, ...input }),
+    delete: (supplierId: string) => invoke('suppliers:delete', { supplierId }),
+  },
+
+  voids: {
+    voidSale: (input: VoidDocumentInput) => invoke('voids:void-sale', input),
+    voidPurchase: (input: VoidDocumentInput) => invoke('voids:void-purchase', input),
+    voidSaleReturn: (input: VoidDocumentInput) => invoke('voids:void-sale-return', input),
+    voidExpense: (input: VoidDocumentInput) => invoke('voids:void-expense', input),
   },
 
   settings: {

@@ -3,7 +3,7 @@
 
 import type { DatabaseHandle } from '../database/repositories/common'
 import { runInTransaction } from '../database/repositories/common'
-import { insertPurchase, insertPurchaseItem, getPurchase, listPurchaseItems } from '../database/repositories/purchases'
+import { insertPurchase, insertPurchaseItem, getPurchase, listPurchases as listPurchaseRows, listPurchaseItems } from '../database/repositories/purchases'
 import { getSupplier, insertSupplier, updateSupplier, softDeleteSupplier, listSuppliers } from '../database/repositories/suppliers'
 import { insertMoneyLedgerEntry } from '../database/repositories/money-ledger'
 import { insertStockBatch } from '../database/repositories/stock'
@@ -218,6 +218,10 @@ export class PurchaseService {
       const items = listPurchaseItems(this.deps.database, purchaseId)
       return serviceOk({ purchase, items })
     } catch (e) { return serviceErr('database_error', e) }
+  }
+
+  async listPurchases(supplierId?: string): Promise<ServiceResult<PurchaseRow[]>> {
+    try { return serviceOk(listPurchaseRows(this.deps.database, supplierId)) } catch (e) { return serviceErr('database_error', e) }
   }
 }
 

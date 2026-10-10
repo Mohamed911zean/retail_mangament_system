@@ -3,10 +3,12 @@ import { CatalogService } from '../services/catalog'
 import { CustomerService } from '../services/customers'
 import { InventoryService } from '../services/inventory'
 import { PaymentService } from '../services/payments'
+import { PurchaseService, SupplierService } from '../services/purchases'
 import { SaleService } from '../services/sales'
 import { SettingsService, resolveSettingsSync } from '../services/settings'
 import { ShiftService } from '../services/shifts'
 import { UserService } from '../services/users'
+import { VoidService } from '../services/voids'
 import { createUlidGenerator, type IdGenerator } from '../services/ids'
 import { systemClock, type Clock } from '../services/clock'
 import { noFaults, type FaultInjector } from '../services/fault-injector'
@@ -22,6 +24,9 @@ export type Services = {
   shifts: ShiftService
   payments: PaymentService
   inventory: InventoryService
+  purchases: PurchaseService
+  suppliers: SupplierService
+  voids: VoidService
 }
 
 export type ServiceFactoryDeps = {
@@ -60,5 +65,8 @@ export function createServices(database: DatabaseHandle, deps: ServiceFactoryDep
     shifts: new ShiftService(common),
     payments: new PaymentService({ ...common, shiftsEnabled: settings.shifts }),
     inventory: new InventoryService({ ...common, allowNegativeStock: settings.allow_negative_stock }),
+    purchases: new PurchaseService({ ...common, allowNegativeStock: settings.allow_negative_stock }),
+    suppliers: new SupplierService(common),
+    voids: new VoidService({ ...common, allowNegativeStock: settings.allow_negative_stock, shiftsEnabled: settings.shifts }),
   }
 }
