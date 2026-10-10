@@ -260,6 +260,7 @@ export const operations: Record<IpcChannel, OperationSpec> = {
         costPricePiasters: v.money(input.costPricePiasters ?? 0, 'costPricePiasters'),
         sellingPricePiasters: v.money(input.sellingPricePiasters ?? 0, 'sellingPricePiasters'),
         taxRateBps: v.integer(input.taxRateBps ?? 0, 'taxRateBps', { min: 0, max: 100_000 }),
+        trackExpiry: v.boolean(input.trackExpiry, 'trackExpiry', false),
         isWeighted: v.boolean(input.isWeighted, 'isWeighted', false),
         lowStockThresholdQty: v.integer(input.lowStockThresholdQty ?? 0, 'lowStockThresholdQty', { min: 0 }),
       })
@@ -276,9 +277,14 @@ export const operations: Record<IpcChannel, OperationSpec> = {
       if (input.name !== undefined) fields.name = v.string(input.name, 'name', { max: 200 })
       if (input.categoryId !== undefined) fields.categoryId = v.optionalId(input.categoryId, 'categoryId') ?? null
       if (input.sku !== undefined) fields.sku = v.optionalText(input.sku, 'sku', { max: 64 }) ?? null
+      if (input.baseUnitName !== undefined) fields.baseUnitName = v.string(input.baseUnitName, 'baseUnitName', { max: 32 })
+      if (input.qtyScale !== undefined) fields.qtyScale = v.oneOf(input.qtyScale, 'qtyScale', [0, 3] as const)
+      if (input.priceUnitQtyBase !== undefined) fields.priceUnitQtyBase = v.integer(input.priceUnitQtyBase, 'priceUnitQtyBase', { min: 1 })
       if (input.sellingPricePiasters !== undefined) fields.sellingPricePiasters = v.money(input.sellingPricePiasters, 'sellingPricePiasters')
       if (input.costPricePiasters !== undefined) fields.costPricePiasters = v.money(input.costPricePiasters, 'costPricePiasters')
       if (input.taxRateBps !== undefined) fields.taxRateBps = v.integer(input.taxRateBps, 'taxRateBps', { min: 0, max: 100_000 })
+      if (input.trackExpiry !== undefined) fields.trackExpiry = v.boolean(input.trackExpiry, 'trackExpiry')
+      if (input.isWeighted !== undefined) fields.isWeighted = v.boolean(input.isWeighted, 'isWeighted')
       if (input.lowStockThresholdQty !== undefined) fields.lowStockThresholdQty = v.integer(input.lowStockThresholdQty, 'lowStockThresholdQty', { min: 0 })
       const updated = await context.services.catalog.updateProduct(requireActor(context), v.id(input.productId, 'productId'), fields)
       if (!updated.ok) return updated
@@ -334,6 +340,21 @@ export const operations: Record<IpcChannel, OperationSpec> = {
       return context.services.catalog.getProductSummary(productId)
     },
   },
+  'catalog:remove-product-unit': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      const productId = v.id(input.productId, 'productId')
+      const units = await context.services.catalog.removeProductUnit(
+        requireActor(context),
+        productId,
+        v.id(input.unitId, 'unitId'),
+      )
+      if (!units.ok) return units
+      return context.services.catalog.getProductSummary(productId)
+    },
+  },
   'catalog:add-barcode': {
     auth: true,
     mutating: true,
@@ -345,6 +366,21 @@ export const operations: Record<IpcChannel, OperationSpec> = {
         productId,
         v.barcode(input.barcode, 'barcode'),
         v.boolean(input.isPrimary, 'isPrimary', false),
+      )
+      if (!barcodes.ok) return barcodes
+      return context.services.catalog.getProductSummary(productId)
+    },
+  },
+  'catalog:remove-barcode': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      const productId = v.id(input.productId, 'productId')
+      const barcodes = await context.services.catalog.removeBarcode(
+        requireActor(context),
+        productId,
+        v.barcode(input.barcode, 'barcode'),
       )
       if (!barcodes.ok) return barcodes
       return context.services.catalog.getProductSummary(productId)

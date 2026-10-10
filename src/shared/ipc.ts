@@ -98,17 +98,30 @@ export type ProductInput = {
   costPricePiasters?: number
   sellingPricePiasters?: number
   taxRateBps?: number
+  /** Turns on the batch/expiry fields for this product (`features.expiry_batches`). */
+  trackExpiry?: boolean
   isWeighted?: boolean
   lowStockThresholdQty?: number
 }
 
+/**
+ * An absent field keeps its stored value. The packaging fields (`baseUnitName`,
+ * `qtyScale`, `priceUnitQtyBase`) are accepted here but the service refuses a
+ * *change* to them once the product has stock movements, because the ledger
+ * stores quantities in the base unit and a new scale would reinterpret them.
+ */
 export type ProductUpdateInput = Partial<{
   name: string
   categoryId: string | null
   sku: string | null
+  baseUnitName: string
+  qtyScale: 0 | 3
+  priceUnitQtyBase: number
   sellingPricePiasters: number
   costPricePiasters: number
   taxRateBps: number
+  trackExpiry: boolean
+  isWeighted: boolean
   lowStockThresholdQty: number
 }>
 
@@ -198,7 +211,9 @@ export const IPC_CHANNELS = [
   'catalog:update-category',
   'catalog:delete-category',
   'catalog:add-product-unit',
+  'catalog:remove-product-unit',
   'catalog:add-barcode',
+  'catalog:remove-barcode',
 
   'customers:list',
   'customers:get',
@@ -276,7 +291,9 @@ export type IpcApi = {
     updateCategory: (categoryId: string, name: string) => Promise<IpcResult<CategoryRow>>
     deleteCategory: (categoryId: string) => Promise<IpcResult<true>>
     addProductUnit: (productId: string, unitName: string, baseQtyPerUnit: number, sellingPricePiasters: number) => Promise<IpcResult<ProductSummary>>
+    removeProductUnit: (productId: string, unitId: string) => Promise<IpcResult<ProductSummary>>
     addBarcode: (productId: string, barcode: string, isPrimary: boolean) => Promise<IpcResult<ProductSummary>>
+    removeBarcode: (productId: string, barcode: string) => Promise<IpcResult<ProductSummary>>
   }
   customers: {
     list: () => Promise<IpcResult<CustomerSummary[]>>

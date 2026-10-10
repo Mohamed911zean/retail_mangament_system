@@ -57,8 +57,10 @@ const api: IpcApi = {
     deleteCategory: (categoryId: string) => invoke('catalog:delete-category', { categoryId }),
     addProductUnit: (productId: string, unitName: string, baseQtyPerUnit: number, sellingPricePiasters: number) =>
       invoke('catalog:add-product-unit', { productId, unitName, baseQtyPerUnit, sellingPricePiasters }),
+    removeProductUnit: (productId: string, unitId: string) => invoke('catalog:remove-product-unit', { productId, unitId }),
     addBarcode: (productId: string, barcode: string, isPrimary: boolean) =>
       invoke('catalog:add-barcode', { productId, barcode, isPrimary }),
+    removeBarcode: (productId: string, barcode: string) => invoke('catalog:remove-barcode', { productId, barcode }),
   },
 
   customers: {
