@@ -21,12 +21,15 @@
     "package:win:portable": "npm run build && electron-builder --win portable --x64",
     "start": "electron .",
     "lint": "eslint .",
+    "check:contrast": "node scripts/check-contrast.ts",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "better-sqlite3": "^13.0.3",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@electron/fuses": "^1.8.0",
