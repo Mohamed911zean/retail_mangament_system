@@ -156,6 +156,9 @@ export function SupplierDetailsDialog({
                         {entry.reversed || entry.reversesEntryId !== null ? (
                           <Badge tone="neutral">{messages.suppliers.reversed}</Badge>
                         ) : (
+                          // Only account-level payments reverse; document payments
+                          // belong to their invoice, not to this list.
+                          entry.entryType === 'supplier_payment' &&
                           canReverse && (
                             <Button variant="ghost" size="sm" onClick={() => setConfirmEntryId(entry.id)}>
                               {messages.suppliers.reversePayment}
