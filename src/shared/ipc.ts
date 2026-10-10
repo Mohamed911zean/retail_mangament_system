@@ -24,6 +24,9 @@ import type {
   SaleItemRow,
   SaleRow,
   ShiftRow,
+  StockBatchRow,
+  StockCountItemRow,
+  StockCountRow,
   StockMovementRow,
   SupplierRow,
 } from './rows'
@@ -222,6 +225,10 @@ export type PurchaseDetails = { purchase: PurchaseRow; items: PurchaseItemRow[] 
 
 export type VoidDocumentInput = { documentId: string; reason: string }
 
+export type AdjustInput = { productId: string; qtyDelta: number; valuePiasters?: number; reason: string }
+export type DamageInput = { productId: string; qtyBase: number; reason: string }
+export type CountItemInput = { stockCountId: string; productId: string; expectedQtyBase: number; countedQtyBase: number }
+
 // ─── Channels ───────────────────────────────────────────────────────────────
 
 /** Every channel the preload is allowed to invoke. Nothing else is exposed. */
@@ -280,6 +287,14 @@ export const IPC_CHANNELS = [
 
   'inventory:on-hand',
   'inventory:list-movements',
+  'inventory:adjust',
+  'inventory:damage',
+  'inventory:list-batches',
+  'inventory:open-count',
+  'inventory:add-count-item',
+  'inventory:post-count',
+  'inventory:list-counts',
+  'inventory:list-count-items',
 
   'purchases:list',
   'purchases:get',
@@ -381,6 +396,14 @@ export type IpcApi = {
   inventory: {
     onHand: (productId: string) => Promise<IpcResult<{ qty: number; valuePiasters: number }>>
     listMovements: (productId?: string) => Promise<IpcResult<StockMovementRow[]>>
+    adjust: (input: AdjustInput) => Promise<IpcResult<{ movementId: string }>>
+    damage: (input: DamageInput) => Promise<IpcResult<{ movementId: string }>>
+    listBatches: (productId: string) => Promise<IpcResult<StockBatchRow[]>>
+    openCount: (notes: string | null) => Promise<IpcResult<StockCountRow>>
+    addCountItem: (input: CountItemInput) => Promise<IpcResult<StockCountItemRow[]>>
+    postCount: (stockCountId: string) => Promise<IpcResult<StockCountRow>>
+    listCounts: () => Promise<IpcResult<StockCountRow[]>>
+    listCountItems: (stockCountId: string) => Promise<IpcResult<StockCountItemRow[]>>
   }
   purchases: {
     list: (supplierId?: string) => Promise<IpcResult<PurchaseRow[]>>
@@ -425,4 +448,4 @@ export type IpcApi = {
   }
 }
 
-export type { Settings, PaymentMethod, MoneyLedgerRow, PurchaseRow, PurchaseItemRow, SupplierRow }
+export type { Settings, PaymentMethod, MoneyLedgerRow, PurchaseRow, PurchaseItemRow, SupplierRow, StockBatchRow, StockCountRow, StockCountItemRow }

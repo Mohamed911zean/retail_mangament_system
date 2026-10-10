@@ -643,6 +643,84 @@ export const operations: Record<IpcChannel, OperationSpec> = {
       return context.services.inventory.listMovements(v.optionalId(input.productId, 'productId') ?? undefined)
     },
   },
+  'inventory:adjust': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.inventory.adjust(
+        requireActor(context),
+        v.id(input.productId, 'productId'),
+        v.integer(input.qtyDelta, 'qtyDelta'),
+        input.valuePiasters === undefined ? undefined : v.money(input.valuePiasters, 'valuePiasters'),
+        v.string(input.reason, 'reason', { max: 300 }),
+      )
+    },
+  },
+  'inventory:damage': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.inventory.recordDamage(
+        requireActor(context),
+        v.id(input.productId, 'productId'),
+        v.integer(input.qtyBase, 'qtyBase', { min: 1 }),
+        v.string(input.reason, 'reason', { max: 300 }),
+      )
+    },
+  },
+  'inventory:list-batches': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.inventory.listBatches(v.id(input.productId, 'productId'))
+    },
+  },
+  'inventory:open-count': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.inventory.openStockCount(requireActor(context), v.optionalText(input.notes, 'notes', { max: 300 }) ?? null)
+    },
+  },
+  'inventory:add-count-item': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.inventory.addCountItem(
+        requireActor(context),
+        v.id(input.stockCountId, 'stockCountId'),
+        v.id(input.productId, 'productId'),
+        v.integer(input.expectedQtyBase, 'expectedQtyBase', { min: 0 }),
+        v.integer(input.countedQtyBase, 'countedQtyBase', { min: 0 }),
+      )
+    },
+  },
+  'inventory:post-count': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.inventory.postStockCount(requireActor(context), v.id(input.stockCountId, 'stockCountId'))
+    },
+  },
+  'inventory:list-counts': {
+    auth: true,
+    mutating: false,
+    handle: async (context) => context.services.inventory.listStockCounts(),
+  },
+  'inventory:list-count-items': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.inventory.listStockCountItems(v.id(input.stockCountId, 'stockCountId'))
+    },
+  },
 
   // ── Purchases ─────────────────────────────────────────────────────────────
   'purchases:list': {

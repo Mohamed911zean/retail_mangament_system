@@ -174,4 +174,8 @@ export class InventoryService {
   async listStockCounts(): Promise<ServiceResult<StockCountRow[]>> {
     try { return serviceOk(listStockCounts(this.deps.database)) } catch (e) { return serviceErr('database_error', e) }
   }
+
+  async listStockCountItems(stockCountId: string): Promise<ServiceResult<StockCountItemRow[]>> {
+    try { return serviceOk(listStockCountItems(this.deps.database, stockCountId)) } catch (e) { return serviceErr('database_error', e) }
+  }
 }

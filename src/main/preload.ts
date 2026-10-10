@@ -1,7 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  AdjustInput,
   CompleteSaleInput,
+  CountItemInput,
   CustomerInput,
+  DamageInput,
   IpcApi,
   IpcChannel,
   IpcResult,
@@ -101,6 +104,14 @@ const api: IpcApi = {
   inventory: {
     onHand: (productId: string) => invoke('inventory:on-hand', { productId }),
     listMovements: (productId?: string) => invoke('inventory:list-movements', { productId }),
+    adjust: (input: AdjustInput) => invoke('inventory:adjust', input),
+    damage: (input: DamageInput) => invoke('inventory:damage', input),
+    listBatches: (productId: string) => invoke('inventory:list-batches', { productId }),
+    openCount: (notes: string | null) => invoke('inventory:open-count', { notes }),
+    addCountItem: (input: CountItemInput) => invoke('inventory:add-count-item', input),
+    postCount: (stockCountId: string) => invoke('inventory:post-count', { stockCountId }),
+    listCounts: () => invoke('inventory:list-counts'),
+    listCountItems: (stockCountId: string) => invoke('inventory:list-count-items', { stockCountId }),
   },
 
   purchases: {

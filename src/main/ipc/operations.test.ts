@@ -627,3 +627,64 @@ describe('runOperation — purchases, suppliers and voids over IPC', () => {
     }
   })
 })
+
+describe('runOperation — inventory adjustments and counts over IPC', () => {
+  it('adjusts, records damage and runs a count from draft to posted', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const product = expectSuccess(
+      await runOperation(
+        'catalog:create-product',
+        { name: 'فول', baseUnitName: 'piece', qtyScale: 0, costPricePiasters: 200, sellingPricePiasters: 300 },
+        context,
+      ),
+    ) as { id: string }
+
+    expectSuccess(await runOperation('inventory:adjust', { productId: product.id, qtyDelta: 50, reason: 'بضاعة زائدة' }, context))
+    expectSuccess(await runOperation('inventory:damage', { productId: product.id, qtyBase: 5, reason: 'تالف' }, context))
+
+    const onHand = expectSuccess(await runOperation('inventory:on-hand', { productId: product.id }, context)) as { qty: number }
+    expect(onHand.qty).toBe(45)
+
+    const count = expectSuccess(await runOperation('inventory:open-count', { notes: 'جرد شهري' }, context)) as {
+      id: string
+      status: string
+    }
+    expect(count.status).toBe('draft')
+
+    const items = expectSuccess(
+      await runOperation(
+        'inventory:add-count-item',
+        { stockCountId: count.id, productId: product.id, expectedQtyBase: 45, countedQtyBase: 40 },
+        context,
+      ),
+    ) as { differenceQtyBase: number }[]
+    expect(items).toHaveLength(1)
+    expect(items[0].differenceQtyBase).toBe(-5)
+
+    const posted = expectSuccess(await runOperation('inventory:post-count', { stockCountId: count.id }, context)) as { status: string }
+    expect(posted.status).toBe('posted')
+
+    const afterPost = expectSuccess(await runOperation('inventory:on-hand', { productId: product.id }, context)) as { qty: number }
+    expect(afterPost.qty).toBe(40)
+
+    const counts = expectSuccess(await runOperation('inventory:list-counts', {}, context)) as { id: string }[]
+    expect(counts.map((row) => row.id)).toContain(count.id)
+
+    const countItems = expectSuccess(await runOperation('inventory:list-count-items', { stockCountId: count.id }, context)) as {
+      differenceQtyBase: number
+    }[]
+    expect(countItems).toHaveLength(1)
+  })
+
+  it('refuses an adjustment without a reason at the boundary', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const error = expectFailure(
+      await runOperation('inventory:adjust', { productId: '01IPCNOREASON0000000001', qtyDelta: 1, reason: '' }, context),
+    )
+    expect(error.code).toBe('invalid_input')
+  })
+})
