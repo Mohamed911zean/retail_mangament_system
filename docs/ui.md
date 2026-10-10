@@ -38,6 +38,8 @@ src/
     settings/*.tsx           one card per concern
     pos/                     the selling screen (see below)
     products/                the catalog screen: list, product dialog, categories
+    purchases/               invoices + suppliers: invoice builder, details/void,
+                             supplier account with statement, payment, reversal
       DesignSystemPage.tsx     dev-only gallery (a lazy chunk in dev builds only)
 ```
 
@@ -112,10 +114,10 @@ Rules that keep it honest:
 
 Built: the shell, navigation, login/first-run setup, Home, Settings (appearance,
 feature flags + presets, printing, backup/restore, licence), the POS screen, the
-products + categories screen, and the dev gallery.
+products + categories screen, the purchases + suppliers screen, and the dev gallery.
 
 Not built yet (they render an explicit "coming soon" panel, never a blank screen):
-inventory, purchases, sales, customers, suppliers, reports.
+inventory, sales, customers, reports.
 
 ## Verifying the UI
 
