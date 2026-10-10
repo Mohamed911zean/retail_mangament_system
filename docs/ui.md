@@ -32,11 +32,12 @@ src/
       Sidebar.tsx, AppHeader.tsx
       navigation.ts            the page list (data, not markup)
       useAuth.ts, useLicense.ts
-    pages/
-      LoginPage.tsx            login + first-run setup
-      HomePage.tsx, SettingsPage.tsx, PlaceholderPage.tsx
-      settings/*.tsx           one card per concern
-      pos/                     the selling screen (see below)
+  pages/
+    LoginPage.tsx            login + first-run setup
+    HomePage.tsx, SettingsPage.tsx, PlaceholderPage.tsx
+    settings/*.tsx           one card per concern
+    pos/                     the selling screen (see below)
+    products/                the catalog screen: list, product dialog, categories
       DesignSystemPage.tsx     dev-only gallery (a lazy chunk in dev builds only)
 ```
 
@@ -110,8 +111,8 @@ Rules that keep it honest:
 ## What is and is not built
 
 Built: the shell, navigation, login/first-run setup, Home, Settings (appearance,
-feature flags + presets, printing, backup/restore, licence), the POS screen, and
-the dev gallery.
+feature flags + presets, printing, backup/restore, licence), the POS screen, the
+products + categories screen, and the dev gallery.
 
 Not built yet (they render an explicit "coming soon" panel, never a blank screen):
 inventory, purchases, sales, customers, suppliers, reports.
