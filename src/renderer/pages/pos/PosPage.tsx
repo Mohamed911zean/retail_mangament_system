@@ -104,6 +104,9 @@ export function PosPage({ user, preferences }: PosPageProps) {
     }
   }, [])
 
+  // First paint loads what selling needs: settings, the shift and the catalog.
+  // IPC data, not derivable from props — the page cannot render without asking.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     let alive = true
     void (async () => {
@@ -129,6 +132,7 @@ export function PosPage({ user, preferences }: PosPageProps) {
       alive = false
     }
   }, [loadProducts])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const totalsOptions = useMemo(
     () => ({

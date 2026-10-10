@@ -36,12 +36,14 @@ export function ShiftCloseDialog({ open, busy, errorText, result, digitStyle, on
   const [notes, setNotes] = useState('')
 
   // A fresh closing starts from an empty drawer count, never from the last one.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       setCountedCashPiasters(0)
       setNotes('')
     }
   }, [open])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function row(label: string, value: string) {
     return (

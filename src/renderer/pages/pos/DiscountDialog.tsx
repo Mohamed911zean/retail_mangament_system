@@ -12,26 +12,10 @@ import { useEffect, useState } from 'react'
 import { Button, Dialog, Field, MoneyInput, Select, TextInput } from '../../components/ui'
 import { messages } from '../../i18n'
 import { formatMoney, type DigitStyle } from '../../lib/format'
-import { normalizeDigits } from '../../../shared/digits'
 import type { CartDiscount } from './cart'
+import { parsePercentToBps } from './discount'
 
 type DiscountKind = CartDiscount['kind']
-
-/**
- * Reads a percentage the cashier typed into basis points, or null when it is not
- * a usable rate.
- *
- * Accepts `٥` and `5.5` alike — an Arabic keyboard produces Arabic-Indic digits
- * and the Arabic decimal separator — and refuses anything finer than one basis
- * point, above 100%, or not a number at all.
- */
-export function parsePercentToBps(text: string): number | null {
-  const normalized = normalizeDigits(text).trim().replace('٫', '.')
-  if (!/^\d{1,3}(\.\d{1,2})?$/.test(normalized)) return null
-  const basisPoints = Math.round(Number(normalized) * 100)
-  if (basisPoints <= 0 || basisPoints > 10000) return null
-  return basisPoints
-}
 
 /** The inverse, for seeding the field: `1250` → `12.5`. */
 function rateToText(rateBps: number): string {
@@ -59,6 +43,9 @@ export function DiscountDialog({ open, title, current, maxPiasters, digitStyle, 
   const [amountPiasters, setAmountPiasters] = useState(0)
   const [percentText, setPercentText] = useState('')
 
+  // Seeding the fields when the dialog opens is a reset, not derived state: the
+  // cashier may have typed a half-finished value the last time it was open.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return
     if (current === undefined) {
@@ -80,6 +67,7 @@ export function DiscountDialog({ open, title, current, maxPiasters, digitStyle, 
     // only when the discount itself does — never on a parent re-render while the
     // cashier is typing.
   }, [open, current])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const percentBps = parsePercentToBps(percentText)
   const valid = kind === 'fixed' ? amountPiasters > 0 && amountPiasters <= maxPiasters : percentBps !== null

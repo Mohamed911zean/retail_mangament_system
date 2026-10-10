@@ -77,9 +77,11 @@ export function PaymentDialog({
 
   // A new invoice starts from nothing: a tender left over from the previous sale
   // would silently pre-pay the next one.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) setTenders([])
   }, [open])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const cashEnabled = methods.includes('cash')
   const splitMethods = SPLIT_METHODS.filter((method) => methods.includes(method))

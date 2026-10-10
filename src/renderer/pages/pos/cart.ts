@@ -154,8 +154,9 @@ export function setLineDiscount(cart: Cart, lineId: string, discount: CartDiscou
       if (line.id !== lineId) return line
       // `undefined` must remove the key, not store `undefined` under it.
       if (discount === undefined) {
-        const { lineDiscount: _dropped, ...rest } = line
-        return rest
+        const next = { ...line }
+        delete next.lineDiscount
+        return next
       }
       return { ...line, lineDiscount: discount }
     }),
@@ -164,8 +165,9 @@ export function setLineDiscount(cart: Cart, lineId: string, discount: CartDiscou
 
 export function setInvoiceDiscount(cart: Cart, discount: CartDiscount | undefined): Cart {
   if (discount === undefined) {
-    const { invoiceDiscount: _dropped, ...rest } = cart
-    return rest
+    const next = { ...cart }
+    delete next.invoiceDiscount
+    return next
   }
   return { ...cart, invoiceDiscount: discount }
 }

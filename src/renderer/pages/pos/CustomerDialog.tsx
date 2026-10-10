@@ -30,6 +30,9 @@ export function CustomerDialog({ open, selected, creditEnabled, digitStyle, onCl
   const [reloadTick, setReloadTick] = useState(0)
   const [query, setQuery] = useState('')
 
+  // The customer list is IPC data, not derivable from props: it loads when the
+  // dialog opens (and on explicit retry), then stays put while typing filters it.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return
     let alive = true
@@ -50,6 +53,7 @@ export function CustomerDialog({ open, selected, creditEnabled, digitStyle, onCl
       alive = false
     }
   }, [open, reloadTick])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // A customer is looked up by the number they call from as often as by name, so
   // the phone is searched too — with Arabic-Indic digits folded, since that is

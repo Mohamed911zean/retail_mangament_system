@@ -40,9 +40,13 @@ export function useAuth() {
     }
   }, [])
 
+  // The session lives in the main process; the first paint must ask who is
+  // signed in. That is synchronization with an external system by definition.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     void refresh()
   }, [refresh])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const login = useCallback(
     async (username: string, password: string): Promise<string | null> => {

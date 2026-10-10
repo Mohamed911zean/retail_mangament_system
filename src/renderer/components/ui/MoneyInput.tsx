@@ -1,8 +1,8 @@
-import { useRef, useState, type Ref } from 'react'
+import { useState, type Ref } from 'react'
 import { cn } from '../../lib/cn'
 import { messages } from '../../i18n'
 import { formatMoneyParts, parseMoneyToPiasters, type DigitStyle } from '../../lib/format'
-import { controlClasses } from './Field'
+import { controlClasses } from './controlClasses'
 
 /**
  * Money field (§4.2). The component owns the *text* the cashier is typing and
@@ -53,15 +53,15 @@ export function MoneyInput({
   ref,
 }: MoneyInputProps) {
   const [text, setText] = useState(() => toText(value, digitStyle))
-  // The value we last sent up. Comparing against it means an external change
-  // (a quick-cash button, a reset after payment) reformats the field, while our
-  // own keystrokes never do.
-  const lastEmitted = useRef(value)
+  // The value last received from the parent. Comparing against it means an
+  // external change (a quick-cash button, a reset after payment) reformats the
+  // field, while our own keystrokes never do. Adjusted during render — the
+  // documented derived-state pattern — so the cashier never sees a stale amount
+  // flicker for one frame.
+  const [prevValue, setPrevValue] = useState(value)
 
-  if (value !== lastEmitted.current) {
-    lastEmitted.current = value
-    // Reformat during render, not in an effect: an effect would paint the stale
-    // text for one frame, which the cashier can see as the amount flickering.
+  if (value !== prevValue) {
+    setPrevValue(value)
     setText(toText(value, digitStyle))
   }
 
@@ -70,19 +70,17 @@ export function MoneyInput({
     const parsed = parseMoneyToPiasters(next)
     if (parsed === null) return
     if (!allowNegative && parsed < 0) return
-    lastEmitted.current = parsed
     onChange(parsed)
   }
 
   function handleBlur() {
     const parsed = parseMoneyToPiasters(text)
     if (parsed === null || (!allowNegative && parsed < 0)) {
-      setText(toText(lastEmitted.current, digitStyle))
+      setText(toText(value, digitStyle))
       return
     }
     setText(toText(parsed, digitStyle))
-    if (parsed !== lastEmitted.current) {
-      lastEmitted.current = parsed
+    if (parsed !== value) {
       onChange(parsed)
     }
   }

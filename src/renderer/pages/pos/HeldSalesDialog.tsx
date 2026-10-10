@@ -29,6 +29,9 @@ export function HeldSalesDialog({ open, reloadToken, digitStyle, onClose, onResu
   const [reloadTick, setReloadTick] = useState(0)
   const [confirmDropId, setConfirmDropId] = useState<string | null>(null)
 
+  // Same contract as the customer picker: IPC data that loads when the dialog
+  // opens, then stays put while the cashier reads it.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return
     let alive = true
@@ -49,6 +52,7 @@ export function HeldSalesDialog({ open, reloadToken, digitStyle, onClose, onResu
       alive = false
     }
   }, [open, reloadToken, reloadTick])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function renderBody() {
     if (failed) {

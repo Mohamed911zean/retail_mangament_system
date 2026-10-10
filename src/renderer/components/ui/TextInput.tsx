@@ -2,7 +2,7 @@ import type { InputHTMLAttributes, ReactNode, Ref } from 'react'
 import { cn } from '../../lib/cn'
 import { messages } from '../../i18n'
 import { CloseIcon, SearchIcon } from '../icons'
-import { controlClasses } from './Field'
+import { controlClasses } from './controlClasses'
 
 /**
  * Text input (§4.2). Height 40 by default, or 48 with `size="lg"` for
@@ -39,7 +39,7 @@ export type SearchInputProps = Omit<TextInputProps, 'type'> & {
  * and a clear button when it has text. The POS screen keeps it auto-focused so
  * a barcode scanner (a keyboard wedge) can always type into it.
  */
-export function SearchInput({ onClear, clearLabel, icon, className, value, size, ...rest }: SearchInputProps) {
+export function SearchInput({ onClear, clearLabel, icon, className, value, size = 'lg', ...rest }: SearchInputProps) {
   const hasValue = typeof value === 'string' && value.length > 0
   return (
     <div className="relative">
@@ -51,7 +51,7 @@ export function SearchInput({ onClear, clearLabel, icon, className, value, size,
         value={value}
         type="search"
         enterKeyHint="done"
-        className={cn(controlClasses(false, 'h-12 ps-11 pe-10'), className)}
+        className={cn(controlClasses(false, size === 'lg' ? 'h-12 ps-11 pe-10' : 'h-10 ps-11 pe-10'), className)}
       />
       {onClear !== undefined && hasValue && (
         <button

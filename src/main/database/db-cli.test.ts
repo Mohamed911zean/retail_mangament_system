@@ -26,5 +26,6 @@ describe('database developer scripts', () => {
     expect(execFileSync(process.execPath, ['scripts/db-cli.cjs', 'reset'], { encoding: 'utf8' })).toContain('reset:ok')
     expect(existsSync(join(devRoot, 'dev.db'))).toBe(false)
     rmSync(devRoot, { recursive: true, force: true })
-  })
+    // Spawns three node processes; weak/slow machines exceed the 5s default.
+  }, 30_000)
 })

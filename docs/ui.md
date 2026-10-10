@@ -50,6 +50,7 @@ PosPage.tsx        the only stateful file: cart, customer, open dialog, IPC call
                    the invoice are computed by the same functions
   payment.ts       PURE tenders, change, and the "may this be saved?" rule
   search.ts        PURE product filtering + exact barcode lookup
+  discount.ts      PURE percent-text → basis-points parsing (Arabic digits aware)
   ProductPicker.tsx  search field + tappable grid (owns the query and its debounce)
   CartTable.tsx      the invoice lines
   TotalsFooter.tsx   subtotal → discounts → tax → rounding → total
@@ -61,7 +62,9 @@ Rules that keep it honest:
 
 - **Every component below `PosPage` is presentational.** They receive integers and
   formatted-ready values (`lineTotals`, `totals`) and send back integers. No
-  arithmetic on money or quantity happens in a `.tsx` file.
+  arithmetic on money or quantity happens in a `.tsx` file. The one exception is
+  the discount percent parser (`discount.ts`): it turns typed text into integer
+  basis points and is unit-tested like the other pure POS modules.
 - **A completed sale drops the cart.** The invoice is never edited after it is
   saved; a correction is a return document, made from the sales screen.
 - **The totals on screen come from `src/domain`** — the same `calculateLineAmounts`

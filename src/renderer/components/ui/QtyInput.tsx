@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { cn } from '../../lib/cn'
 import { messages } from '../../i18n'
 import { formatQtyValue, parseQtyToUnits, unitsPerDisplayUnit, type DigitStyle } from '../../lib/format'
 import { MinusIcon, PlusIcon } from '../icons'
-import { controlClasses } from './Field'
+import { controlClasses } from './controlClasses'
 
 /**
  * Quantity field (§4.2, §6.2). Same contract as `MoneyInput`: the text is local,
@@ -51,17 +51,18 @@ export function QtyInput({
   className,
 }: QtyInputProps) {
   const [text, setText] = useState(() => formatQtyValue(value, qtyScale, digitStyle))
-  const lastEmitted = useRef(value)
+  // Same derived-state contract as MoneyInput: only an external value change
+  // reformats the field, never our own keystrokes.
+  const [prevValue, setPrevValue] = useState(value)
   const step = stepUnits ?? unitsPerDisplayUnit(qtyScale)
 
-  if (value !== lastEmitted.current) {
-    lastEmitted.current = value
+  if (value !== prevValue) {
+    setPrevValue(value)
     setText(formatQtyValue(value, qtyScale, digitStyle))
   }
 
   function emit(units: number) {
     if (!allowNegative && units < 0) units = 0
-    lastEmitted.current = units
     setText(formatQtyValue(units, qtyScale, digitStyle))
     onChange(units)
   }
@@ -71,19 +72,17 @@ export function QtyInput({
     const parsed = parseQtyToUnits(next, qtyScale)
     if (parsed === null) return
     if (!allowNegative && parsed < 0) return
-    lastEmitted.current = parsed
     onChange(parsed)
   }
 
   function handleBlur() {
     const parsed = parseQtyToUnits(text, qtyScale)
     if (parsed === null || (!allowNegative && parsed < 0)) {
-      setText(formatQtyValue(lastEmitted.current, qtyScale, digitStyle))
+      setText(formatQtyValue(value, qtyScale, digitStyle))
       return
     }
     setText(formatQtyValue(parsed, qtyScale, digitStyle))
-    if (parsed !== lastEmitted.current) {
-      lastEmitted.current = parsed
+    if (parsed !== value) {
       onChange(parsed)
     }
   }
