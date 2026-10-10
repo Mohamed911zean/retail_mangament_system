@@ -787,3 +787,43 @@ transaction after every stock movement.
 - **Keyboard shortcuts are ignored while a field has focus** (except the function
   keys), so `Delete` edits the quantity in the box instead of deleting the
   invoice line.
+
+## Decision #13 - `sale.credit_override` sits outside the frozen schema's permission list
+
+**Date:** 2026-10-10  
+**Status:** Accepted; recorded so the drift from `docs/schema-v1.md` is deliberate.
+
+- **What the schema froze.** `docs/schema-v1.md` §8 fixes the permission codes at
+  seven: `sale.zero_price`, `sale.expired_override`, `stock.negative_override`,
+  `cash.manual_move`, `document.void`, `product.price_change`,
+  `product.cost_change` — with owner and manager holding all of them and cashier
+  holding none. That list is a statement about *the data contract*: "roles and
+  permissions are defined in code, not in tables".
+- **What is registered here.** `src/shared/permissions.ts` carries an eighth
+  code, `sale.credit_override`, and it is the only code the schema does not
+  name. It is enforced in `SaleService.completeSale` and recorded as
+  `creditOverride: true` on the sale's audit row.
+- **The credit-limit rule it belongs to.** When the chosen customer has a
+  positive `credit_limit_piasters` and the sale would leave a due amount, the
+  service projects the customer's *derived* balance (existing ledger balance plus
+  this sale's due) and refuses with `credit_limit_exceeded` when the projection
+  exceeds the limit. `NULL` means unlimited credit; `0` means no credit at all —
+  the two are not the same thing and are never collapsed. The projection reads
+  `repositories/balances.ts`, the same SQL the operator-facing balance read uses
+  (Decision #8), so the number the customer is told and the number the sale is
+  refused against cannot disagree.
+- **Why the code is outside the frozen list.** The schema's seven codes all guard
+  a *pricing or stock figure* the operator is about to corrupt by hand — a zero
+  price, an expired item, negative stock, a drawer move, a void, a changed price
+  or cost. The credit limit is different in kind: it is a policy limit on a
+  *derived* balance, and the schema deliberately leaves the enforcement of that
+  limit to the service layer (it says a positive limit "is enforced by the sale
+  service", not by any constraint). An override of it is therefore app-level
+  policy, exactly like the limit itself, and belongs with the other override
+  codes rather than in the schema's table of figure-guarding permissions.
+- **Backward compatibility.** Adding a code to `permissions.ts` cannot change the
+  meaning of any frozen permission: the map is additive, `owner`/`manager` gain
+  the new code by holding "all", `cashier` still holds none, and no migration or
+  stored row is touched. A cashier who attempts to sell past a limit still gets
+  `credit_limit_exceeded`; they simply cannot lift it.
+

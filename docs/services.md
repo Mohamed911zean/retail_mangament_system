@@ -21,6 +21,8 @@ Services live in `src/main/services/`. They are the only layer allowed to mutate
 
 When the customer has a positive `credit_limit_piasters` and the sale leaves a due amount, the service projects the customer's derived balance (existing balance plus this sale's due) and refuses with `credit_limit_exceeded` if it exceeds the limit. A manager/owner may override with the audited `sale.credit_override` permission; the audit row records `creditOverride: true`. `NULL` means unlimited credit and `0` means no credit.
 
+`sale.credit_override` is the eighth permission code and the only one outside the frozen schema's seven (`docs/schema-v1.md` §8). The schema pins the codes that guard a price or stock figure an operator could corrupt by hand; a credit limit is a policy on a *derived* balance, and the schema explicitly leaves its enforcement to this service, so the override of it is app-level policy too. The code is additive — owner/manager hold it by holding "all", cashier holds none — and needs no migration, so no frozen permission changes meaning. Rationale recorded as Decision #13.
+
 ## PurchaseService (`purchases.ts`)
 
 `receivePurchase(actor, input)` — manager-only. Creates supplier invoice: purchase + items + stock receipt movements (with negative-stock settlement) + `purchase_payment` ledger entries + optional supplier credit. Tax via domain inclusive-breakdown math.
