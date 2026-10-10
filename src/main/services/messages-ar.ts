@@ -33,6 +33,7 @@ export const arabicServiceMessages = {
   'errors.stock_count_not_draft': 'لا يمكن تعديل عدّة مخزون بعد نشرها',
   'errors.expense_invalid_amount': 'قيمة المصروف يجب أن تكون أكبر من صفر',
   'errors.product_has_stock': 'لا يمكن حذف منتج يوجد له مخزون',
+  'errors.product_has_movements': 'لا يمكن تغيير وحدة القياس أو معامل الكمية بعد وجود حركات على الصنف',
   'errors.credit_limit_exceeded': 'تجاوزت الحد الائتماني للعميل، سجّل دفعة أو اطلب موافقة المدير',
   'errors.reversal_already_exists': 'تم عكس هذه العملية مسبقاً',
   'errors.invalid_reversal_target': 'لا يمكن عكس هذه العملية',

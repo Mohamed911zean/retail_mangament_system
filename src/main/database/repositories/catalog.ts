@@ -52,24 +52,30 @@ export function insertProduct(database: DatabaseHandle, row: Partial<ProductRow>
   ))
 }
 
-export function updateProduct(database: DatabaseHandle, id: string, fields: Partial<Pick<ProductRow, 'name' | 'categoryId' | 'sku' | 'sellingPricePiasters' | 'costPricePiasters' | 'taxRateBps' | 'lowStockThresholdQty' | 'metadata' | 'updatedAt'>>): void {
+export function updateProduct(database: DatabaseHandle, id: string, fields: Partial<Pick<ProductRow, 'name' | 'categoryId' | 'sku' | 'baseUnitName' | 'qtyScale' | 'priceUnitQtyBase' | 'sellingPricePiasters' | 'costPricePiasters' | 'taxRateBps' | 'trackExpiry' | 'isWeighted' | 'lowStockThresholdQty' | 'metadata' | 'updatedAt'>>): void {
   const current = getProduct(database, id)
   if (current === undefined) return
   const name = fields.name ?? current.name
   const categoryId = fields.categoryId !== undefined ? fields.categoryId : current.categoryId
   const sku = fields.sku !== undefined ? fields.sku : current.sku
+  const baseUnitName = fields.baseUnitName ?? current.baseUnitName
+  const qtyScale = fields.qtyScale ?? current.qtyScale
+  const priceUnitQtyBase = fields.priceUnitQtyBase ?? current.priceUnitQtyBase
   const sellingPricePiasters = fields.sellingPricePiasters ?? current.sellingPricePiasters
   const costPricePiasters = fields.costPricePiasters ?? current.costPricePiasters
   const taxRateBps = fields.taxRateBps ?? current.taxRateBps
+  const trackExpiry = fields.trackExpiry ?? current.trackExpiry
+  const isWeighted = fields.isWeighted ?? current.isWeighted
   const lowStockThresholdQty = fields.lowStockThresholdQty ?? current.lowStockThresholdQty
   const metadata = fields.metadata !== undefined ? fields.metadata : current.metadata
   const updatedAt = fields.updatedAt ?? Date.now()
   execute(() => database.prepare(`
     UPDATE products
-    SET name = ?, category_id = ?, sku = ?, selling_price_piasters = ?, cost_price_piasters = ?,
-        tax_rate_bps = ?, low_stock_threshold_qty = ?, metadata = ?, updated_at = ?
+    SET name = ?, category_id = ?, sku = ?, base_unit_name = ?, qty_scale = ?, price_unit_qty_base = ?,
+        selling_price_piasters = ?, cost_price_piasters = ?, tax_rate_bps = ?, track_expiry = ?,
+        is_weighted = ?, low_stock_threshold_qty = ?, metadata = ?, updated_at = ?
     WHERE id = ?
-  `).run(name, categoryId, sku, sellingPricePiasters, costPricePiasters, taxRateBps, lowStockThresholdQty, metadata, updatedAt, id))
+  `).run(name, categoryId, sku, baseUnitName, qtyScale, priceUnitQtyBase, sellingPricePiasters, costPricePiasters, taxRateBps, trackExpiry ? 1 : 0, isWeighted ? 1 : 0, lowStockThresholdQty, metadata, updatedAt, id))
 }
 
 export function softDeleteProduct(database: DatabaseHandle, id: string, deletedAt: number): void {
@@ -87,6 +93,10 @@ export function listProductUnits(database: DatabaseHandle, productId: string): P
   return mapRows<ProductUnitRow>(execute(() => database.prepare('SELECT * FROM product_units WHERE product_id = ? AND deleted_at IS NULL ORDER BY unit_name').all(productId)) as Record<string, unknown>[])
 }
 
+export function softDeleteProductUnit(database: DatabaseHandle, id: string, deletedAt: number): void {
+  execute(() => database.prepare('UPDATE product_units SET deleted_at = ?, updated_at = ? WHERE id = ?').run(deletedAt, deletedAt, id))
+}
+
 export function insertBarcode(database: DatabaseHandle, row: Partial<BarcodeRow>): void {
   execute(() => database.prepare(`
     INSERT INTO barcodes (id,barcode,product_id,product_unit_id,is_primary,deleted_at,created_at,updated_at,device_id)
@@ -101,4 +111,8 @@ export function listBarcodes(database: DatabaseHandle, productId: string): Barco
 export function getBarcode(database: DatabaseHandle, barcode: string): BarcodeRow | undefined {
   const row = execute(() => database.prepare('SELECT * FROM barcodes WHERE barcode = ? AND deleted_at IS NULL').get(barcode)) as Record<string, unknown> | undefined
   return row === undefined ? undefined : mapRow<BarcodeRow>(row)
+}
+
+export function softDeleteBarcode(database: DatabaseHandle, id: string, deletedAt: number): void {
+  execute(() => database.prepare('UPDATE barcodes SET deleted_at = ?, updated_at = ? WHERE id = ?').run(deletedAt, deletedAt, id))
 }

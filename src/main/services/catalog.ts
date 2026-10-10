@@ -3,10 +3,10 @@ import { runInTransaction } from '../database/repositories/common'
 import {
   getCategory, listCategories, insertCategory, updateCategory, softDeleteCategory,
   getProduct, getProductBySku, listProducts, insertProduct, updateProduct, softDeleteProduct,
-  insertProductUnit, listProductUnits,
-  insertBarcode, listBarcodes, getBarcode,
+  insertProductUnit, listProductUnits, softDeleteProductUnit,
+  insertBarcode, listBarcodes, getBarcode, softDeleteBarcode,
 } from '../database/repositories/catalog'
-import { getOnHand } from '../database/repositories/stock'
+import { getOnHand, listStockMovements } from '../database/repositories/stock'
 import type { CategoryRow, ProductRow, BarcodeRow, ProductUnitRow } from '../database/rows'
 import type { ProductSummary } from '../../shared/ipc'
 import type { Clock } from './clock'
@@ -34,6 +34,28 @@ export type ProductInput = {
   lowStockThresholdQty?: number
   metadata?: string | null
 }
+
+/**
+ * What `updateProduct` accepts. It is a subset of `ProductInput`: `id` is the
+ * argument, and nothing here is required — an absent field keeps its stored
+ * value. The packaging fields are included because a shop types the unit after
+ * creating the product ("كرتونة" once they remember it), but they are guarded
+ * separately (see `PACKAGING_FIELDS`).
+ */
+export type ProductUpdateFields = Partial<Pick<ProductInput,
+  | 'name' | 'categoryId' | 'sku'
+  | 'baseUnitName' | 'qtyScale' | 'priceUnitQtyBase'
+  | 'sellingPricePiasters' | 'costPricePiasters' | 'taxRateBps'
+  | 'trackExpiry' | 'isWeighted' | 'lowStockThresholdQty' | 'metadata'>>
+
+/**
+ * Fields that reinterpret every quantity already recorded for the product.
+ * The stock ledger stores the base unit, so switching `piece` → `كجم` or moving
+ * `qtyScale` from 0 to 3 would silently turn a stored 5 into 5 kilograms; that
+ * is a data translation, not a rename, and it is only safe while the product has
+ * no movements to reinterpret.
+ */
+const PACKAGING_FIELDS = ['baseUnitName', 'qtyScale', 'priceUnitQtyBase'] as const
 
 type CatalogDeps = { database: DatabaseHandle; clock: Clock; ids?: IdGenerator; deviceId: string; faults?: FaultInjector }
 
@@ -143,7 +165,7 @@ export class CatalogService {
     } catch (e) { return serviceErr('database_error', e) }
   }
 
-  async updateProduct(actor: Actor, id: string, fields: Partial<Pick<ProductInput, 'name' | 'categoryId' | 'sku' | 'sellingPricePiasters' | 'costPricePiasters' | 'taxRateBps' | 'lowStockThresholdQty' | 'metadata'>>): Promise<ServiceResult<ProductRow>> {
+  async updateProduct(actor: Actor, id: string, fields: ProductUpdateFields): Promise<ServiceResult<ProductRow>> {
     if (actor.role === 'cashier') return serviceErr('permission_denied')
     try {
       const existing = getProduct(this.deps.database, id)
@@ -151,6 +173,15 @@ export class CatalogService {
       if (fields.sku && fields.sku !== existing.sku) {
         const dupe = getProductBySku(this.deps.database, fields.sku)
         if (dupe !== undefined && dupe.id !== id) return serviceErr('invalid_input', { field: 'sku', message: 'sku already exists' })
+      }
+      // Only a *changed* value is guarded: re-sending the value that is already
+      // stored must not be refused, or a form that always submits every field
+      // would be impossible to save once the product has moved.
+      const packagingChanged = PACKAGING_FIELDS.some(
+        (field) => fields[field] !== undefined && fields[field] !== existing[field],
+      )
+      if (packagingChanged && listStockMovements(this.deps.database, id).length > 0) {
+        return serviceErr('product_has_movements', { productId: id })
       }
       const now = this.deps.clock.now()
       runInTransaction(this.deps.database, (tx) => {
@@ -186,6 +217,12 @@ export class CatalogService {
     if (actor.role === 'cashier') return serviceErr('permission_denied')
     try {
       if (getProduct(this.deps.database, productId) === undefined) return serviceErr('not_found')
+      // The schema has no unique index here, but two units called "كرتونة" would
+      // make the POS cart's line key ambiguous (it is built from the unit name),
+      // so the same name may not be added twice to one product.
+      const duplicate = listProductUnits(this.deps.database, productId)
+        .some((unit) => unit.unitName.trim().toLowerCase() === unitName.trim().toLowerCase())
+      if (duplicate) return serviceErr('invalid_input', { field: 'unitName', message: 'unit name already used' })
       const now = this.deps.clock.now()
       const id = this.ids.next()
       runInTransaction(this.deps.database, (tx) => {
@@ -198,6 +235,22 @@ export class CatalogService {
 
   async listProductUnits(productId: string): Promise<ServiceResult<ProductUnitRow[]>> {
     try { return serviceOk(listProductUnits(this.deps.database, productId)) } catch (e) { return serviceErr('database_error', e) }
+  }
+
+  async removeProductUnit(actor: Actor, productId: string, unitId: string): Promise<ServiceResult<ProductUnitRow[]>> {
+    if (actor.role === 'cashier') return serviceErr('permission_denied')
+    try {
+      if (getProduct(this.deps.database, productId) === undefined) return serviceErr('not_found')
+      const units = listProductUnits(this.deps.database, productId)
+      if (!units.some((unit) => unit.id === unitId)) return serviceErr('not_found', { unitId })
+      const now = this.deps.clock.now()
+      runInTransaction(this.deps.database, (tx) => {
+        softDeleteProductUnit(tx, unitId, now)
+        writeAudit(tx, this.ids, { userId: actor.userId, action: 'product_unit_deleted', entityType: 'product_unit', entityId: unitId, before: { productId }, now, deviceId: this.deps.deviceId })
+        this.faults.after('product_unit.deleted_audited')
+      })
+      return serviceOk(listProductUnits(this.deps.database, productId))
+    } catch (e) { return serviceErr('database_error', e) }
   }
 
   // ─── Barcodes ─────────────────────────────────────────────────────────────
@@ -220,6 +273,27 @@ export class CatalogService {
 
   async listBarcodes(productId: string): Promise<ServiceResult<BarcodeRow[]>> {
     try { return serviceOk(listBarcodes(this.deps.database, productId)) } catch (e) { return serviceErr('database_error', e) }
+  }
+
+  /**
+   * Soft-deletes one code. The schema's unique index is partial
+   * (`WHERE deleted_at IS NULL`), so the same code can be re-added later — a
+   * mis-typed barcode is not burned forever.
+   */
+  async removeBarcode(actor: Actor, productId: string, barcode: string): Promise<ServiceResult<BarcodeRow[]>> {
+    if (actor.role === 'cashier') return serviceErr('permission_denied')
+    try {
+      if (getProduct(this.deps.database, productId) === undefined) return serviceErr('not_found')
+      const row = getBarcode(this.deps.database, barcode)
+      if (row === undefined || row.productId !== productId) return serviceErr('not_found', { barcode })
+      const now = this.deps.clock.now()
+      runInTransaction(this.deps.database, (tx) => {
+        softDeleteBarcode(tx, row.id, now)
+        writeAudit(tx, this.ids, { userId: actor.userId, action: 'barcode_deleted', entityType: 'barcode', entityId: row.id, before: { productId, barcode }, now, deviceId: this.deps.deviceId })
+        this.faults.after('barcode.deleted_audited')
+      })
+      return serviceOk(listBarcodes(this.deps.database, productId))
+    } catch (e) { return serviceErr('database_error', e) }
   }
 
   async lookupBarcode(barcode: string): Promise<ServiceResult<{ product: ProductRow; barcode: BarcodeRow }>> {
