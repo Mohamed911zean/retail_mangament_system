@@ -1,0 +1,141 @@
+/**
+ * Renderer stylesheet entry.
+ *
+ * Structure:
+ *   1. Tailwind               — utility engine only.
+ *   2. `tokens.css`           — the design tokens (single source of truth).
+ *   3. `@theme`               — maps the tokens into Tailwind's namespaces, so
+ *                               components write `bg-brand-700`, never `#02534B`.
+ *   4. base layer             — RTL document defaults and the Arabic font.
+ *
+ * No remote content: the font is a local woff2 file (see `fonts.css`).
+ */
+@import 'tailwindcss';
+@import './tokens.css';
+@import './fonts.css';
+
+/* Tailwind v4 detects sources by walking the project; this keeps it explicit. */
+@source '../../';
+
+@theme {
+  /* Brand scale — the only part a client overlay may override (§9). */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  /* Semantic names for the neutral scale, so intent is readable in markup. */
+  --color-surface: var(--gray-0);
+  --color-app: var(--bg-app);
+  --color-panel: var(--gray-100);
+  --color-line: var(--gray-200);
+  --color-line-subtle: var(--gray-300);
+  --color-line-control: var(--gray-400);
+  --color-muted: var(--gray-500);
+  --color-secondary: var(--gray-600);
+  --color-strong: var(--gray-800);
+  --color-ink: var(--gray-900);
+
+  /* Semantic status colours: solid = fill, soft = badge/alert pair. */
+  --color-success: var(--success-solid);
+  --color-success-soft: var(--success-soft-bg);
+  --color-success-ink: var(--success-soft-text);
+  --color-warning: var(--warning-solid);
+  --color-warning-ink: var(--warning-soft-text);
+  --color-warning-soft: var(--warning-soft-bg);
+  --color-error: var(--error-solid);
+  --color-error-soft: var(--error-soft-bg);
+  --color-error-ink: var(--error-soft-text);
+  --color-info: var(--info-solid);
+  --color-info-soft: var(--info-soft-bg);
+  --color-info-ink: var(--info-soft-text);
+
+  --font-sans: var(--font-app);
+
+  /* Type scale. The radius, shadow and spacing scales are *not* repeated here:
+     Tailwind's own `--radius-*`, `--shadow-*` and `--spacing` variables are
+     overridden in `tokens.css`, and its utilities read them directly, so there
+     is exactly one definition of each. */
+  --text-display: var(--font-size-display);
+  --text-h1: var(--font-size-h1);
+  --text-h2: var(--font-size-h2);
+  --text-h3: var(--font-size-h3);
+  --text-dense: var(--font-size-dense);
+  --text-caption: var(--font-size-caption);
+}
+
+@layer base {
+  html {
+    /* RTL is the default; logical properties everywhere (design system §3.1). */
+    direction: rtl;
+    font-family: var(--font-app);
+    font-size: var(--font-size-body);
+    line-height: 1.6;
+    color: var(--gray-900);
+    background-color: var(--bg-app);
+  }
+
+  body {
+    margin: 0;
+    /* Desktop app: the shell owns scrolling, not the document. */
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100vh;
+  }
+
+  /* Never remove focus outlines (§4.2): a cashier works on the keyboard. */
+  :focus-visible {
+    outline: 2px solid var(--brand-600);
+    outline-offset: 2px;
+  }
+
+  /* Money, quantities and barcodes are isolated so a minus or a percent sign
+     never flips in RTL (§6.2). */
+  .numeric {
+    direction: ltr;
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Directional icons (arrows, chevrons) mirror in RTL; logos do not (§6.3). */
+  [dir='rtl'] .icon-directional {
+    transform: scaleX(-1);
+  }
+
+  /* Only cheap properties animate, and Lite mode already zeroed the durations. */
+  @media (prefers-reduced-motion: no-preference) {
+    button,
+    a,
+    input,
+    select,
+    textarea {
+      transition:
+        background-color var(--motion-fast) var(--motion-ease),
+        border-color var(--motion-fast) var(--motion-ease),
+        color var(--motion-fast) var(--motion-ease);
+    }
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--gray-300);
+    border-radius: var(--radius-sm);
+  }
+
+  ::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+}

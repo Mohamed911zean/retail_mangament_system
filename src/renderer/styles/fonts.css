@@ -1,0 +1,38 @@
+/**
+ * Cairo — the only UI font (design system §3.3). It covers Arabic and Latin, so
+ * there is no second font file to load and nothing to fetch at runtime.
+ *
+ * The files are local woff2 in `../assets/fonts/`, imported by this stylesheet
+ * rather than referenced from `public/`: Vite then fingerprints them and rewrites
+ * the URL **relative** to the emitted CSS, which is what makes them resolve when
+ * the packaged app loads `index.html` over `file://` (a `/fonts/...` URL would
+ * point at the drive root there). They are shipped inside the installer.
+ *
+ * Nothing here reaches the network: the CSP allows `font-src 'self'` only.
+ *
+ * Licence: SIL Open Font License 1.1 — the text ships with the app as
+ * `public/fonts/OFL.txt`.
+ */
+@font-face {
+  font-family: cairo;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/cairo-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: cairo;
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/cairo-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: cairo;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/cairo-700.woff2') format('woff2');
+}

@@ -1,0 +1,136 @@
+/**
+ * Design tokens — the single source of truth for colour, space, radius,
+ * elevation, motion and type (docs/design_system/design_system.md §3).
+ *
+ * Rules:
+ * - Components never hardcode a hex value or a pixel size; they use these
+ *   variables (through the Tailwind theme mapped in `app.css`).
+ * - A client overlay may override the `--brand-*` scale only. Semantic colours
+ *   and neutrals are fixed, so contrast can never be broken by a rebrand.
+ * - Every pair used for text meets the ratios in §3.2; `scripts/check-contrast.ts`
+ *   fails the build when a token change breaks one.
+ */
+:root {
+  /* ── Brand (forest green) ───────────────────────────────────────────────── */
+  --brand-50: #e9fcf3;
+  --brand-100: #cdf5e1;
+  --brand-200: #9be6c6;
+  --brand-300: #5fd0a6;
+  --brand-400: #2db587;
+  --brand-500: #0e9670;
+  --brand-600: #077a5e;
+  --brand-700: #02534b;
+  --brand-800: #013f3a;
+  --brand-900: #012e2b;
+
+  /* ── Neutrals (slate) ───────────────────────────────────────────────────── */
+  --gray-0: #ffffff;
+  --bg-app: #f8fdfa;
+  --gray-100: #f1f5f9;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-800: #1e293b;
+  --gray-900: #0f172a;
+
+  /* ── Semantic ───────────────────────────────────────────────────────────── */
+  --success-solid: #047857;
+  --success-soft-bg: #d1fae5;
+  --success-soft-text: #065f46;
+
+  --warning-solid: #f59e0b;
+  /* White on the amber solid fails contrast, so the solid pairs with dark text. */
+  --warning-on-solid: var(--gray-900);
+  --warning-soft-bg: #fef3c7;
+  --warning-soft-text: #92400e;
+
+  --error-solid: #dc2626;
+  --error-soft-bg: #fee2e2;
+  --error-soft-text: #b91c1c;
+
+  --info-solid: #2563eb;
+  --info-soft-bg: #dbeafe;
+  --info-soft-text: #1d4ed8;
+
+  /* ── Spacing (4px base) ─────────────────────────────────────────────────── */
+  /* Tailwind's `--spacing` multiplier is 4px, so `p-1..p-12` already match this
+     scale; these names exist for plain CSS and the POS layout maths. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --page-padding: var(--space-6);
+  --card-padding: var(--space-5);
+  --field-gap: var(--space-4);
+  --spacing: 4px;
+
+  /* ── Radius ─────────────────────────────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* ── Elevation ──────────────────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
+  --shadow-md: 0 4px 12px rgb(15 23 42 / 12%);
+
+  /* ── Motion ─────────────────────────────────────────────────────────────── */
+  --motion-fast: 120ms;
+  --motion-base: 160ms;
+  --motion-ease: ease-out;
+
+  /* ── Z-index ────────────────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-dropdown: 20;
+  --z-dialog: 30;
+  --z-toast: 40;
+
+  /* ── Type scale (Cairo only) ────────────────────────────────────────────── */
+  /* Named `--font-size-*` (not `--text-*`) so the Tailwind `@theme` mapping in
+     `app.css` can alias them without a self-reference. */
+  --font-app: cairo, 'Segoe UI', Tahoma, sans-serif;
+  --font-size-display: 32px;
+  --font-size-h1: 28px;
+  --font-size-h2: 22px;
+  --font-size-h3: 18px;
+  --font-size-body: 16px;
+  --font-size-dense: 14px;
+  --font-size-small: 14px;
+  --font-size-caption: 12px;
+
+  /* ── Controls ───────────────────────────────────────────────────────────── */
+  --control-height-sm: 32px;
+  --control-height-md: 40px;
+  --control-height-lg: 48px;
+  --control-height-pos: 56px;
+  --sidebar-width: 240px;
+  --sidebar-width-collapsed: 72px;
+  --page-header-height: 64px;
+}
+
+/**
+ * Lite mode (§3.4): for very weak PCs. Transitions and shadows are switched off
+ * without touching a single component. Set on `<html data-lite="true">` by the
+ * settings store, and forced on when the OS asks for reduced motion.
+ */
+:root[data-lite='true'] {
+  --shadow-sm: none;
+  --shadow-md: none;
+  --motion-fast: 0ms;
+  --motion-base: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+  }
+}
