@@ -11,6 +11,7 @@ import { HomePage } from '../pages/HomePage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { ProductsPage } from '../pages/products/ProductsPage'
+import { PurchasesPage } from '../pages/purchases/PurchasesPage'
 import { PosPage } from '../pages/pos/PosPage'
 
 /**
@@ -26,11 +27,11 @@ const PAGE_HEADINGS: Record<NavKey, { title: string; description?: string }> = {
   home: { title: messages.pages.homeTitle, description: messages.pages.homeSubtitle },
   pos: { title: messages.pages.posTitle },
   products: { title: messages.pages.productsTitle },
+  purchases: { title: messages.pages.purchasesTitle },
+  suppliers: { title: messages.nav.suppliers },
   inventory: { title: messages.nav.inventory },
-  purchases: { title: messages.nav.purchases },
   sales: { title: messages.nav.sales },
   customers: { title: messages.nav.customers },
-  suppliers: { title: messages.nav.suppliers },
   reports: { title: messages.nav.reports },
   settings: { title: messages.pages.settingsTitle, description: messages.pages.settingsSubtitle },
   'design-system': { title: messages.nav.designSystem },
@@ -83,6 +84,10 @@ export function AppShell({ user, onLogout, licenseStatus, readOnly, onActivateLi
         return <PosPage user={user} preferences={preferences} />
       case 'products':
         return <ProductsPage user={user} preferences={preferences} />
+      case 'purchases':
+        return <PurchasesPage user={user} preferences={preferences} initialTab="invoices" />
+      case 'suppliers':
+        return <PurchasesPage user={user} preferences={preferences} initialTab="suppliers" />
       case 'design-system':
         return DevGallery === null ? (
           <PlaceholderPage />
