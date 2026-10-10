@@ -95,6 +95,7 @@ const api: IpcApi = {
     reverseSupplierPayment: (input: ReverseEntryInput) => invoke('payments:reverse-supplier-payment', input),
     customerBalance: (customerId: string) => invoke('payments:customer-balance', { customerId }),
     supplierBalance: (supplierId: string) => invoke('payments:supplier-balance', { supplierId }),
+    listEntries: (party: { customerId?: string; supplierId?: string }) => invoke('payments:list-entries', party),
   },
 
   inventory: {

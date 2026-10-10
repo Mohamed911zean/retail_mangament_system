@@ -585,4 +585,45 @@ describe('runOperation — purchases, suppliers and voids over IPC', () => {
     )
     expect(error.code).toBe('invalid_input')
   })
+
+  it('lists supplier entries and marks reversed ones', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const supplier = expectSuccess(await runOperation('suppliers:create', { name: 'مورد' }, context)) as { id: string }
+
+    // Card payments need no open shift, so the statement works either way.
+    const payment = expectSuccess(
+      await runOperation('payments:supplier-payment', { supplierId: supplier.id, amountPiasters: 3000, method: 'card' }, context),
+    ) as { id: string }
+
+    const entries = expectSuccess(await runOperation('payments:list-entries', { supplierId: supplier.id }, context)) as {
+      id: string
+      reversed: boolean
+      reversesEntryId: string | null
+    }[]
+    expect(entries).toHaveLength(1)
+    expect(entries[0].reversed).toBe(false)
+
+    expectSuccess(await runOperation('payments:reverse-supplier-payment', { entryId: payment.id, reason: 'دفعة مكررة' }, context))
+
+    const after = expectSuccess(await runOperation('payments:list-entries', { supplierId: supplier.id }, context)) as {
+      id: string
+      reversed: boolean
+      reversesEntryId: string | null
+    }[]
+    expect(after).toHaveLength(2)
+    expect(after.find((row) => row.id === payment.id)?.reversed).toBe(true)
+    expect(after.find((row) => row.reversesEntryId === payment.id)).toBeDefined()
+  })
+
+  it('requires exactly one party for the entries listing', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    for (const payload of [{}, { customerId: '01IPCBOTH00000000000001', supplierId: '01IPCBOTH00000000000002' }]) {
+      const error = expectFailure(await runOperation('payments:list-entries', payload, context))
+      expect(error.code).toBe('invalid_input')
+    }
+  })
 })

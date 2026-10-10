@@ -612,6 +612,19 @@ export const operations: Record<IpcChannel, OperationSpec> = {
       return context.services.payments.getSupplierBalance(v.id(input.supplierId, 'supplierId'))
     },
   },
+  'payments:list-entries': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      const customerId = v.optionalId(input.customerId, 'customerId') ?? undefined
+      const supplierId = v.optionalId(input.supplierId, 'supplierId') ?? undefined
+      if ((customerId === undefined) === (supplierId === undefined)) {
+        throw new ValidationError('customerId', 'expected exactly one of customerId, supplierId')
+      }
+      return context.services.payments.listEntries({ customerId, supplierId })
+    },
+  },
 
   // ── Inventory ─────────────────────────────────────────────────────────────
   'inventory:on-hand': {

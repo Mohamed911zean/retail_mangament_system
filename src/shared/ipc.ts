@@ -183,6 +183,9 @@ export type ReceiptInput = { customerId: string; amountPiasters: number; method:
 export type SupplierPaymentInput = { supplierId: string; amountPiasters: number; method: PaymentMethod; referenceText?: string | null }
 export type ReverseEntryInput = { entryId: string; reason?: string | null }
 
+/** One money-ledger row plus whether a compensating reversal points at it. */
+export type LedgerEntrySummary = MoneyLedgerRow & { reversed: boolean }
+
 export type UserCreateInput = { username: string; displayName: string; role: Role; password: string }
 export type UserUpdateInput = Partial<{ displayName: string; role: Role; isActive: boolean }>
 
@@ -273,6 +276,7 @@ export const IPC_CHANNELS = [
   'payments:reverse-supplier-payment',
   'payments:customer-balance',
   'payments:supplier-balance',
+  'payments:list-entries',
 
   'inventory:on-hand',
   'inventory:list-movements',
@@ -371,6 +375,8 @@ export type IpcApi = {
     reverseSupplierPayment: (input: ReverseEntryInput) => Promise<IpcResult<{ id: string }>>
     customerBalance: (customerId: string) => Promise<IpcResult<{ balancePiasters: number; status: string }>>
     supplierBalance: (supplierId: string) => Promise<IpcResult<{ balancePiasters: number; status: string }>>
+    /** Party statement rows for one customer or one supplier (never both). */
+    listEntries: (party: { customerId?: string; supplierId?: string }) => Promise<IpcResult<LedgerEntrySummary[]>>
   }
   inventory: {
     onHand: (productId: string) => Promise<IpcResult<{ qty: number; valuePiasters: number }>>

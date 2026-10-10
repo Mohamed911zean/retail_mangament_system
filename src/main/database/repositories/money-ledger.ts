@@ -23,6 +23,14 @@ export function findReversalOfEntry(database: DatabaseHandle, entryId: string): 
   return row === undefined ? undefined : mapRow<MoneyLedgerRow>(row)
 }
 
+/** Party statement rows: every entry carrying this customer or supplier id. */
+export function listMoneyLedgerForParty(database: DatabaseHandle, party: { customerId?: string; supplierId?: string }): MoneyLedgerRow[] {
+  const rows = party.customerId !== undefined
+    ? execute(() => database.prepare('SELECT * FROM money_ledger WHERE customer_id = ? ORDER BY occurred_at,id').all(party.customerId))
+    : execute(() => database.prepare('SELECT * FROM money_ledger WHERE supplier_id = ? ORDER BY occurred_at,id').all(party.supplierId))
+  return mapRows<MoneyLedgerRow>(rows as Record<string, unknown>[])
+}
+
 export function insertMoneyLedgerEntry(database: DatabaseHandle, row: Partial<MoneyLedgerRow>): void {
   execute(() => database.prepare(`
     INSERT INTO money_ledger (id,entry_type,direction,amount_piasters,payment_method,customer_id,supplier_id,sale_id,

@@ -2,10 +2,11 @@ import type { DatabaseHandle } from '../database/repositories/common'
 import { runInTransaction } from '../database/repositories/common'
 import { getCustomer } from '../database/repositories/customers'
 import { getSupplier } from '../database/repositories/suppliers'
-import { findReversalOfEntry, getMoneyLedgerEntry, insertMoneyLedgerEntry } from '../database/repositories/money-ledger'
+import { findReversalOfEntry, getMoneyLedgerEntry, insertMoneyLedgerEntry, listMoneyLedgerForParty } from '../database/repositories/money-ledger'
 import { getCustomerBalance as loadCustomerBalance, getSupplierBalance as loadSupplierBalance } from '../database/repositories/balances'
 import { getOpenShift } from '../database/repositories/shifts'
 import type { CustomerBalance, SupplierBalance } from '../../domain/balances'
+import type { MoneyLedgerRow } from '../database/rows'
 import { assertPermission, type Actor } from './permissions'
 import { serviceErr, serviceOk, type ServiceResult } from './result'
 import type { Clock } from './clock'
@@ -35,6 +36,9 @@ export type ReversePaymentInput = {
   entryId: string
   reason?: string | null
 }
+
+/** One ledger row plus whether a compensating reversal already points at it. */
+export type LedgerEntrySummary = MoneyLedgerRow & { reversed: boolean }
 
 type PaymentDeps = {
   database: DatabaseHandle
@@ -277,6 +281,21 @@ export class PaymentService {
       const result = loadSupplierBalance(this.deps.database, supplierId)
       if (!result.ok) return serviceErr(result.error.code, result.error)
       return serviceOk(result.value)
+    } catch (e: unknown) {
+      return serviceErr('database_error', e)
+    }
+  }
+
+  async listEntries(party: { customerId?: string; supplierId?: string }): Promise<ServiceResult<LedgerEntrySummary[]>> {
+    try {
+      if (party.customerId !== undefined && getCustomer(this.deps.database, party.customerId) === undefined) {
+        return serviceErr('not_found', { field: 'customerId' })
+      }
+      if (party.supplierId !== undefined && getSupplier(this.deps.database, party.supplierId) === undefined) {
+        return serviceErr('not_found', { field: 'supplierId' })
+      }
+      const rows = listMoneyLedgerForParty(this.deps.database, party)
+      return serviceOk(rows.map((row) => ({ ...row, reversed: findReversalOfEntry(this.deps.database, row.id) !== undefined })))
     } catch (e: unknown) {
       return serviceErr('database_error', e)
     }
