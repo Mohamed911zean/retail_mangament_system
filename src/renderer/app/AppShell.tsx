@@ -10,6 +10,7 @@ import { AppHeader } from './AppHeader'
 import { HomePage } from '../pages/HomePage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { SettingsPage } from '../pages/SettingsPage'
+import { ProductsPage } from '../pages/products/ProductsPage'
 import { PosPage } from '../pages/pos/PosPage'
 
 /**
@@ -24,6 +25,7 @@ const DevGallery = import.meta.env.DEV ? lazy(() => import('../pages/DesignSyste
 const PAGE_HEADINGS: Record<NavKey, { title: string; description?: string }> = {
   home: { title: messages.pages.homeTitle, description: messages.pages.homeSubtitle },
   pos: { title: messages.pages.posTitle },
+  products: { title: messages.pages.productsTitle },
   inventory: { title: messages.nav.inventory },
   purchases: { title: messages.nav.purchases },
   sales: { title: messages.nav.sales },
@@ -79,6 +81,8 @@ export function AppShell({ user, onLogout, licenseStatus, readOnly, onActivateLi
         )
       case 'pos':
         return <PosPage user={user} preferences={preferences} />
+      case 'products':
+        return <ProductsPage user={user} preferences={preferences} />
       case 'design-system':
         return DevGallery === null ? (
           <PlaceholderPage />

@@ -18,6 +18,7 @@ import { BoxIcon, CartIcon, ChartIcon, HomeIcon, ReceiptIcon, SettingsIcon, Stor
 export type NavKey =
   | 'home'
   | 'pos'
+  | 'products'
   | 'inventory'
   | 'purchases'
   | 'sales'
@@ -41,6 +42,7 @@ export type NavItem = {
 export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'home', label: messages.nav.home, icon: HomeIcon, built: true },
   { key: 'pos', label: messages.nav.pos, icon: CartIcon, built: true },
+  { key: 'products', label: messages.nav.products, icon: BoxIcon, built: true },
   { key: 'inventory', label: messages.nav.inventory, icon: BoxIcon, built: false },
   { key: 'purchases', label: messages.nav.purchases, icon: TruckIcon, built: false },
   { key: 'sales', label: messages.nav.sales, icon: ReceiptIcon, built: false },
