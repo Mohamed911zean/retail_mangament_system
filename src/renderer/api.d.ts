@@ -1,8 +1,8 @@
-import type { AppApi } from '../shared/printing'
+import type { IpcApi } from '../shared/ipc'
 
 declare global {
   interface Window {
-    api: AppApi
+    api: IpcApi
   }
 }
 
