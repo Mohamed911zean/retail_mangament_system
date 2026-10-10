@@ -635,3 +635,155 @@ transaction after every stock movement.
   document's own totals are wrong or a reversal's metadata/amount does not
   match, so detection strength is unchanged.
 
+## Decision #10 - Typed IPC layer (renderer ⇄ main contract)
+
+**Date:** 2026-10-09  
+**Status:** Accepted; the UI is built on top of it.
+
+- **One contract file:** `src/shared/ipc.ts` holds the channel list, every
+  payload/DTO type and the `IpcApi` shape the preload exposes. The renderer
+  imports nothing from `src/main`, and the main process imports nothing from
+  `src/renderer`.
+- **The main process never rejects a channel.** Every handler resolves to
+  `IpcResult<T> = { ok: true, value } | { ok: false, error }`. Electron's
+  rejection path serializes the error and drops custom properties, which would
+  destroy the stable `code` and the Arabic `messageKey`; resolving keeps them
+  intact and keeps the window alive (AGENTS.md §3 rule 7).
+- **The actor is derived in main.** `SessionStore` holds the logged-in
+  `PublicUser`; `runOperation` builds the `Actor` from it. The renderer can
+  never send a user id or a role, so permissions cannot be spoofed.
+- **Read-only licence mode blocks writes centrally:** every channel marked
+  `mutating` is refused with `read_only_mode` before the service runs.
+  `auth:setup` is deliberately *not* mutating: a brand-new, still-unlicensed
+  device must be able to create its first owner, and the service refuses a
+  second call with `setup_already_completed`. `auth:login` is also not mutating
+  even though it stamps `last_login_at` — that is an audit detail, not shop
+  data, and a read-only app still has to be reachable.
+- **Electron stays out of the logic:** `ipc/platform.ts` describes everything
+  the IPC layer needs from the shell (printers, backups, licence, version).
+  `operations.ts` therefore runs under Vitest with a fake platform, and
+  `register.ts` is the only file that touches `electron`.
+- **Services are built per call, not cached** (`ipc/services.ts`). Feature flags
+  (`allow_negative_stock`, `shifts`) are then always current, a database restore
+  can swap the connection without a stale handle, and no global state survives
+  between operations (also required for a possible future LAN mode).
+- **Validation is hand-rolled and dependency-free** (`ipc/validate.ts`). Money is
+  validated as safe integer piasters and ids against a strict pattern, so a bad
+  value cannot reach SQL. Every failure carries the offending `field`, which the
+  UI uses to highlight the input.
+- **Arabic errors are enforced by a test:** `ipc/error-messages.test.ts` walks
+  the main-process sources and fails when a raised error code has no message in
+  `src/renderer/i18n/ar.json` / `src/main/services/messages-ar.ts`.
+- **Shared shapes moved to `src/shared/`** (row DTOs, `Settings`, permissions,
+  `PublicUser`) and are re-exported by the main process, so there is exactly one
+  definition of each and main/renderer cannot drift.
+- **Deferred on purpose:** the purchase, return, void and stock-count IPC
+  surfaces are added together with their screens in Phase 2, so the contract
+  does not carry untested channels.
+
+
+## Decision #11 - UI foundation (tokens, component kit, shell, login)
+
+**Date:** 2026-10-09  
+**Status:** Accepted; the POS screen is built on top of it.  
+**Details:** `docs/ui.md`.
+
+- **Tailwind CSS v4 with tokens as CSS variables** (`src/renderer/styles/tokens.css`).
+  Tokens are the single source of truth: a component writes `bg-brand-700`, never
+  `#02534B` and never a raw px. Client overlays may override `--brand-*` only,
+  so a rebrand cannot break a contrast pair.
+- **Tailwind's own namespace variables are overridden, not duplicated.** Radius,
+  shadow and spacing utilities read `--radius-*`, `--shadow-*` and `--spacing`,
+  so the `@theme` block only aliases colours, the font stack and the type scale.
+  Mapping those three namespaces in `@theme` as well would mean two definitions
+  of the same value, which is exactly the drift the token file exists to prevent.
+- **No UI library.** Dialog, Toast, Table and the form controls are ~60 lines
+  each, hand-written. MUI/Ant-sized kits are banned by the design system (§4.2)
+  and a headless kit would still be a runtime dependency on a 2 GB-RAM target;
+  the only behaviour we need is a focus trap, `Esc` and a live region.
+- **Primitives are presentational and integer-in/integer-out.** They know nothing
+  about the domain, the IPC contract or Arabic business vocabulary: money arrives
+  and leaves as piasters, quantity as the smallest unit. All UI text comes from
+  `src/renderer/i18n/ar.json` through the `messages`/`translate` helpers, so no
+  screen can invent wording and an error code from main becomes a sentence here.
+- **`MoneyInput` / `QtyInput` own their text, not their value.** Reformatting on
+  every keystroke moves the caret and eats digits on a POS keyboard, so the field
+  keeps what was typed, emits an integer when the text parses, and re-renders the
+  canonical `12.50` on blur. An unparseable or over-precise value is *rejected*,
+  never rounded — silently turning `12.505` into `12.50` loses someone's money.
+- **Navigation is a `useState`, not a router.** One window, one user, no URL to
+  restore; a router would be a dependency for nothing. The page list is data
+  (`app/navigation.ts`), so the sidebar and the page switch cannot disagree.
+- **UI-only preferences live in `localStorage`; business settings live in the DB.**
+  Lite mode and the digit style change no money, stock or document, so they must
+  not cost a migration and a backup. `parsePreferences` is pure and tested, so a
+  corrupted store cannot stop the app booting.
+- **Page visibility uses roles, not permission codes.** The permission model is
+  action-level (`sale.zero_price`, `document.void`, …); there is no `settings.manage`
+  yet. The renderer only *hides* the item — the main process re-checks every
+  operation, so this is a convenience, not a defence.
+- **The Phase-0 demo screens were ported, not deleted:** printing, backup/restore
+  and licence activation now live in Settings as real sections, so nothing that
+  was verified in Phase 0 became unreachable.
+- **Open item:** the Cairo woff2 files (`src/renderer/assets/fonts/cairo-{400,600,700}.woff2`)
+  are not in the repo yet. Until they are, the app renders with the documented
+  fallback (`Segoe UI`, `Tahoma`) — the stack is already the token's fallback, so
+  adding the files needs no code change. The fonts are imported by `fonts.css`
+  (not referenced from `public/`) so Vite fingerprints them and rewrites the URL
+  relative to the CSS: that is what makes them load over `file://` in the
+  packaged app. `public/fonts/OFL.txt` ships the licence with the installer.
+
+## Decision #12 - The POS screen
+
+**Date:** 2026-10-10  
+**Status:** Accepted; first real business screen.  
+**Details:** `docs/ui.md` ("The selling screen").
+
+- **The screen reuses `src/domain` for its totals instead of recomputing them.**
+  `pages/pos/cart.ts` builds `LineInput[]` and calls the same
+  `calculateLineAmounts` / `calculateSaleTotals` the sale service calls. A screen
+  with its own arithmetic would eventually print a different number from the one
+  it displayed, and a shop that sees that stops trusting both. The cost is that
+  the renderer bundle now contains `src/domain` — cheap (pure functions, no
+  imports) and the whole point of keeping `domain/` free of DB/Electron/React.
+- **One stateful file.** `PosPage.tsx` owns the cart, the customer and which
+  dialog is open, and is the only POS file that calls IPC. Everything below it is
+  presentational and integer-in/integer-out, so the risky part (money, quantity,
+  discount shapes) lives in three pure modules with unit tests
+  (`cart.ts`, `payment.ts`, `search.ts`) instead of in JSX.
+- **Two discount vocabularies, one translation point.** IPC uses
+  `{kind:'percent', basisPoints}`; `src/domain/discount.ts` uses
+  `{kind:'percentage', rateBps}`. The cart holds the IPC shape (it is what gets
+  sent) and `toDomainDiscount` inside `cart.ts` is the only place the two meet —
+  the same role `parseSaleInput`'s translation plays in the main process.
+- **A completed sale drops the cart; it is never edited afterwards.** A wrong
+  invoice is corrected by a return document from the sales screen, not by
+  reopening it. This keeps a receipt that has already been handed over from
+  disagreeing with the books, and it removes a whole class of "which copy is
+  real?" bugs.
+- **A failed print is a warning, never a failed sale.** The sale is committed
+  before the printer is touched; if printing throws, the screen keeps a warning
+  banner plus a reprint button. Reporting a saved sale as failed would make a
+  cashier ring it up twice.
+- **Recall consumes the hold.** `sales:recall-held` only reads the payload, so
+  the screen drops the hold explicitly after a successful recall — otherwise the
+  same parked invoice could be resumed twice and sold twice.
+- **The receipt printer is a renderer preference, not a DB setting.** It names a
+  driver on *this* PC (`Preferences.receiptPrinter`, alongside `autoPrintReceipt`),
+  so choosing it costs no migration and no backup. Settings seeds it from the
+  Windows default on first run, and the POS prints only when it is non-empty and
+  auto-print is on.
+- **Payment methods come from Settings.** The dialog renders only the methods in
+  `settings.payment_methods`; offering a card field to a cash-only shop would
+  record money against a method that never arrives.
+- **Closing a shift shows the reconciliation before the gate reopens.** A
+  successful close empties `shift`, which would otherwise swap the screen for the
+  open-shift gate and lose the counted-vs-expected figure before anyone read it,
+  so the gate waits for the dialog to be dismissed.
+- **Stacked dialogs suppress the parent's `Esc`.** `Dialog` listens in the
+  capture phase, so with the customer picker open over the payment dialog a single
+  `Esc` would close both and throw away the tenders already entered;
+  `PaymentDialog` therefore takes `nestedOpen` and refuses to dismiss itself.
+- **Keyboard shortcuts are ignored while a field has focus** (except the function
+  keys), so `Delete` edits the quantity in the box instead of deleting the
+  invoice line.
