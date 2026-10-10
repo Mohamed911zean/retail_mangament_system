@@ -95,3 +95,39 @@ with a cost price. With shifts enabled, open a shift before cash payments.
 - Full keyboard flow (Tab order, Esc, Enter in category-style inputs).
 - Expiry/batch line fields (only visible with `features.expiry_batches` on).
 - Supplier with many statement rows: scroll behaviour inside the dialog.
+
+## Screen 3 — Customers (`be6c2d1`, no new IPC)
+
+Setup: log in as owner/manager. Seed a customer with a credit limit, or create
+one below. Make a credit/POS sale against them to see a balance.
+
+### Customer list
+- [ ] Empty state shows "لا يوجد عملاء بعد" with "عميل جديد" when empty.
+- [ ] Search filters by Arabic name fragment and by phone digits
+      (Western and Arabic-Indic both match).
+- [ ] Row shows balance: amount owed, "لا يوجد مستحق" when zero,
+      amount + "رصيد دائن للعميل" when overpaid.
+- [ ] Credit limit column: "بدون حد", "بدون آجل (نقدي فقط)", or the amount.
+- [ ] Cashier role: list is read-only (no add/edit/details buttons).
+
+### Create / edit
+- [ ] "عميل جديد": name required; phone/address optional; limit defaults to
+      "بدون حد". Saves with toast "تم حفظ العميل".
+- [ ] Edit: set limit to "مبلغ مخصص" 5000, save, reopen: shows the amount.
+- [ ] Set limit to "بدون آجل": POS credit sales to this customer are refused.
+
+### Account dialog (بيانات العميل)
+- [ ] Header shows balance, limit, and phone.
+- [ ] "تحصيل من العميل": amount + method + note → toast "تم تسجيل التحصيل",
+      balance drops, new "سند قبض" row in the statement.
+- [ ] Statement rows show date, type (سند قبض / دفعة فاتورة / مرتجع للحساب /
+      عكس قيد) and amount; reversals carry "معكوسة".
+- [ ] Reverse a receipt (owner/manager): inline reason + yes/no, toast
+      "تم عكس السند", balance restored.
+- [ ] Document rows (دفعة فاتورة) show no reverse button — they belong to
+      their invoice.
+- [ ] Cashier: reversal buttons hidden.
+
+### NOT verified by the AI in the real GUI
+- RTL layout of the list and both dialogs at 1280×720 and 1366×768.
+- Full keyboard flow (Tab order, Esc, Enter-to-save).
