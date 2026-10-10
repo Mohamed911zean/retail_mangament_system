@@ -282,3 +282,15 @@ export function WalletIcon(props: IconProps) {
   )
 }
 
+/** Stock counts: a clipboard, so it never reads as "products". */
+export function ClipboardIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect x="6" y="4" width="12" height="17" rx="2" />
+      <path d="M9 4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" />
+      <path d="M9 10.5h6" />
+      <path d="M9 14.5h6" />
+    </IconBase>
+  )
+}
+

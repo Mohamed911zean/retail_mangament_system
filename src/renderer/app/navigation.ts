@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import type { Role } from '../../shared/permissions'
 import { messages } from '../i18n'
-import { BoxIcon, CartIcon, ChartIcon, HomeIcon, ReceiptIcon, SettingsIcon, StoreIcon, TruckIcon, UsersIcon, type IconProps } from '../components/icons'
+import { BoxIcon, CartIcon, ChartIcon, ClipboardIcon, HomeIcon, ReceiptIcon, SettingsIcon, StoreIcon, TruckIcon, UsersIcon, type IconProps } from '../components/icons'
 
 /**
  * Sidebar navigation (design system §4.6).
@@ -43,7 +43,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'home', label: messages.nav.home, icon: HomeIcon, built: true },
   { key: 'pos', label: messages.nav.pos, icon: CartIcon, built: true },
   { key: 'products', label: messages.nav.products, icon: BoxIcon, built: true },
-  { key: 'inventory', label: messages.nav.inventory, icon: BoxIcon, built: false },
+  { key: 'inventory', label: messages.nav.inventory, icon: ClipboardIcon, built: true },
   { key: 'purchases', label: messages.nav.purchases, icon: TruckIcon, built: true },
   { key: 'sales', label: messages.nav.sales, icon: ReceiptIcon, built: false },
   { key: 'customers', label: messages.nav.customers, icon: UsersIcon, built: true },
