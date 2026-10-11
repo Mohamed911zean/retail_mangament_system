@@ -223,3 +223,28 @@ balance (see Screen 2 steps). Set the PC timezone to Africa/Cairo.
 - RTL layout of all tabs and tables at 1280×720 and 1366×768.
 - Day boundaries use device-local time (assumed Cairo); verify on the shop PC.
 - Real Excel open + real printer output.
+
+## Screen 7 — Settings + Users + Backup/Restore + license (`da3fb83`, no new IPC)
+
+Setup: log in as owner. The Settings page is hidden for cashiers.
+
+### Users (المستخدمون)
+- [ ] Table shows username, display name, role badge, active badge, last login
+      ("أبداً" when never).
+- [ ] "مستخدم جديد": username/display/role/password (4+ chars) → toast
+      "تم حفظ المستخدم". Duplicate username shows the taken-name error inline.
+- [ ] Edit: display name, role, active toggle. As manager, the owner role is
+      not offered and owners cannot be edited.
+- [ ] Change password per user → toast "تم تغيير كلمة المرور"; log in with it.
+- [ ] Deactivate (not your own account — the button is replaced by the reason):
+      confirm names the user; row becomes "متوقف"; login refused afterwards.
+
+### Backup/restore + license
+- [ ] Restore confirm now carries the sequence-jump warning
+      ("ستقفز أرقام الفواتير القادمة للأمام...").
+- [ ] License with ≤30 days left shows "ينتهي الترخيص خلال N يوم"; >30 days
+      shows only the expiry date; expired shows the expired state.
+
+### NOT verified by the AI in the real GUI
+- RTL layout of the users table and dialogs at 1280×720 and 1366×768.
+- Real restore round-trip on the shop PC.

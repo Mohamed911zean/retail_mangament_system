@@ -35,7 +35,8 @@ src/
   pages/
     LoginPage.tsx            login + first-run setup
     HomePage.tsx, SettingsPage.tsx, PlaceholderPage.tsx
-    settings/*.tsx           one card per concern
+    settings/*.tsx           one card per concern (appearance, features,
+                             printing, backup/restore, licence, users)
     pos/                     the selling screen (see below)
     products/                the catalog screen: list, product dialog, categories
     purchases/               invoices + suppliers: invoice builder, details/void,
