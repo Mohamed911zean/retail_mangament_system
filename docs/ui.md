@@ -46,6 +46,8 @@ src/
                              (draft then post), expiry list, review list
     treasury/                drawer: expenses with void, manual cash moves,
                              shift history with the difference view
+    reports/                 figures: daily sales buckets, profit, stock value,
+                             balances; range presets, CSV export, print
       DesignSystemPage.tsx     dev-only gallery (a lazy chunk in dev builds only)
 ```
 
@@ -121,10 +123,11 @@ Rules that keep it honest:
 Built: the shell, navigation, login/first-run setup, Home, Settings (appearance,
 feature flags + presets, printing, backup/restore, licence), the POS screen, the
 products + categories screen, the purchases + suppliers screen, the customers
-screen, the inventory screen, the treasury screen, and the dev gallery.
+screen, the inventory screen, the treasury screen, the reports screen, and
+the dev gallery.
 
-Not built yet (they render an explicit "coming soon" panel, never a blank screen):
-sales, reports.
+Not built yet (it renders an explicit "coming soon" panel, never a blank screen):
+the sales list. All Phase-2 screens except sales are built.
 
 ## Verifying the UI
 

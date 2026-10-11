@@ -194,3 +194,32 @@ moves and cash expenses.
 ### NOT verified by the AI in the real GUI
 - RTL layout of both tabs and all dialogs at 1280×720 and 1366×768.
 - Full keyboard flow. Cash-move history has no list (covered by shift close).
+
+## Screen 6 — Reports (`7a8ce7a`, IPC `1e4a4fe`)
+
+Setup: log in as owner/manager. Seed a purchase, a cash sale, and a supplier
+balance (see Screen 2 steps). Set the PC timezone to Africa/Cairo.
+
+### Sales + profit tabs
+- [ ] Sales tab shows today: invoice count, revenue, paid, due + per-day rows.
+- [ ] Presets (اليوم/أمس/آخر ٧ أيام/هذا الشهر) and custom من/إلى change the
+      figures; a voided invoice never appears in revenue.
+- [ ] Profit tab: revenue, discounts, cost, gross profit, margin %, line and
+      return counts. Hand-check one sale: revenue − cost = profit.
+- [ ] Invalid range (empty date) keeps the previous figures, no crash.
+
+### Stock + balances tabs
+- [ ] Stock tab: total value card, low-stock table, review list, expired
+      batches (after loading them with the الصلاحية button when the feature
+      is on).
+- [ ] Balances tab: receivables/payables cards + owing customers and payable
+      suppliers. Zero-balance parties are hidden.
+- [ ] CSV export per tab downloads a file that opens in Excel with Arabic
+      intact (BOM + `;` separators).
+- [ ] Print button opens the system print dialog with only the report visible
+      (no sidebar, header, or filters).
+
+### NOT verified by the AI in the real GUI
+- RTL layout of all tabs and tables at 1280×720 and 1366×768.
+- Day boundaries use device-local time (assumed Cairo); verify on the shop PC.
+- Real Excel open + real printer output.
