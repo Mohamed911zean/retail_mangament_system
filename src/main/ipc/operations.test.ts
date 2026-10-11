@@ -688,3 +688,66 @@ describe('runOperation — inventory adjustments and counts over IPC', () => {
     expect(error.code).toBe('invalid_input')
   })
 })
+
+describe('runOperation — expenses, cash moves and shift history over IPC', () => {
+  it('records an expense and cash moves, then closes with the difference', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const opened = expectSuccess(await runOperation('shifts:open', { openingCashPiasters: 1000 }, context)) as { id: string }
+
+    // 200 cash expense + 500 cash in: 1000 − 200 + 500 = 1300 expected.
+    expectSuccess(
+      await runOperation(
+        'shifts:record-expense',
+        { shiftId: opened.id, category: 'كهرباء', description: 'فاتورة الكهرباء', amountPiasters: 200, paymentMethod: 'cash' },
+        context,
+      ),
+    )
+    expectSuccess(await runOperation('shifts:cash-in', { shiftId: opened.id, amountPiasters: 500, referenceText: 'سلفة' }, context))
+
+    const expenses = expectSuccess(await runOperation('shifts:list-expenses', { shiftId: opened.id }, context)) as {
+      amountPiasters: number
+      status: string
+    }[]
+    expect(expenses).toHaveLength(1)
+    expect(expenses[0].amountPiasters).toBe(200)
+
+    const closed = expectSuccess(
+      await runOperation('shifts:close', { shiftId: opened.id, countedCashPiasters: 1300 }, context),
+    ) as { expectedCashPiasters: number; differencePiasters: number; reconciliation: string }
+    expect(closed.expectedCashPiasters).toBe(1300)
+    expect(closed.differencePiasters).toBe(0)
+    expect(closed.reconciliation).toBe('balanced')
+
+    const history = expectSuccess(await runOperation('shifts:list', {}, context)) as {
+      id: string
+      status: string
+      expectedCashPiasters: number | null
+      countedCashPiasters: number | null
+      differencePiasters: number | null
+    }[]
+    expect(history).toHaveLength(1)
+    expect(history[0].status).toBe('closed')
+    expect(history[0].expectedCashPiasters).toBe(1300)
+    expect(history[0].countedCashPiasters).toBe(1300)
+    expect(history[0].differencePiasters).toBe(0)
+  })
+
+  it('refuses an expense on a closed shift', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const opened = expectSuccess(await runOperation('shifts:open', { openingCashPiasters: 0 }, context)) as { id: string }
+    expectSuccess(await runOperation('shifts:close', { shiftId: opened.id, countedCashPiasters: 0 }, context))
+
+    const error = expectFailure(
+      await runOperation(
+        'shifts:record-expense',
+        { shiftId: opened.id, category: 'نظافة', description: 'منظفات', amountPiasters: 100, paymentMethod: 'cash' },
+        context,
+      ),
+    )
+    expect(error.code).toBe('invalid_shift_state')
+  })
+})

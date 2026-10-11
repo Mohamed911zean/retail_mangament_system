@@ -16,6 +16,7 @@ import type { LicenseStatus } from './license/api'
 import type {
   CategoryRow,
   CustomerRow,
+  ExpenseRow,
   MoneyLedgerRow,
   ProductRow,
   ProductUnitRow,
@@ -229,6 +230,16 @@ export type AdjustInput = { productId: string; qtyDelta: number; valuePiasters?:
 export type DamageInput = { productId: string; qtyBase: number; reason: string }
 export type CountItemInput = { stockCountId: string; productId: string; expectedQtyBase: number; countedQtyBase: number }
 
+export type ExpenseInput = {
+  shiftId: string
+  category: string
+  description: string
+  amountPiasters: number
+  paymentMethod: PaymentMethod
+}
+
+export type CashMoveInput = { shiftId: string; amountPiasters: number; referenceText?: string | null }
+
 // ─── Channels ───────────────────────────────────────────────────────────────
 
 /** Every channel the preload is allowed to invoke. Nothing else is exposed. */
@@ -276,6 +287,12 @@ export const IPC_CHANNELS = [
   'shifts:current',
   'shifts:open',
   'shifts:close',
+  'shifts:list',
+  'shifts:get',
+  'shifts:record-expense',
+  'shifts:cash-in',
+  'shifts:cash-out',
+  'shifts:list-expenses',
 
   'payments:receipt',
   'payments:reverse-receipt',
@@ -382,6 +399,12 @@ export type IpcApi = {
     current: () => Promise<IpcResult<ShiftRow | null>>
     open: (input: OpenShiftInput) => Promise<IpcResult<{ id: string }>>
     close: (input: CloseShiftInput) => Promise<IpcResult<CloseShiftResult>>
+    list: () => Promise<IpcResult<ShiftRow[]>>
+    get: (shiftId: string) => Promise<IpcResult<ShiftRow>>
+    recordExpense: (input: ExpenseInput) => Promise<IpcResult<{ id: string }>>
+    cashIn: (input: CashMoveInput) => Promise<IpcResult<{ id: string }>>
+    cashOut: (input: CashMoveInput) => Promise<IpcResult<{ id: string }>>
+    listExpenses: (shiftId?: string) => Promise<IpcResult<ExpenseRow[]>>
   }
   payments: {
     receipt: (input: ReceiptInput) => Promise<IpcResult<{ id: string }>>
@@ -448,4 +471,4 @@ export type IpcApi = {
   }
 }
 
-export type { Settings, PaymentMethod, MoneyLedgerRow, PurchaseRow, PurchaseItemRow, SupplierRow, StockBatchRow, StockCountRow, StockCountItemRow }
+export type { Settings, PaymentMethod, MoneyLedgerRow, PurchaseRow, PurchaseItemRow, SupplierRow, StockBatchRow, StockCountRow, StockCountItemRow, ExpenseRow }

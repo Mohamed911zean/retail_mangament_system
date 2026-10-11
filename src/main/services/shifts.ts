@@ -1,9 +1,9 @@
 import type { DatabaseHandle } from '../database/repositories/common'
 import { runInTransaction } from '../database/repositories/common'
-import { getShift, getOpenShift, insertShift, closeShift as closeShiftRow } from '../database/repositories/shifts'
-import { insertExpense } from '../database/repositories/expenses'
+import { getShift, getOpenShift, insertShift, listShifts, closeShift as closeShiftRow } from '../database/repositories/shifts'
+import { insertExpense, listExpenses } from '../database/repositories/expenses'
 import { insertMoneyLedgerEntry, listMoneyLedger } from '../database/repositories/money-ledger'
-import type { ShiftRow } from '../database/rows'
+import type { ExpenseRow, ShiftRow } from '../database/rows'
 import { calculateExpectedShiftCash, reconcileShiftCash } from '../../domain/shifts'
 import type { Clock } from './clock'
 import type { FaultInjector } from './fault-injector'
@@ -271,5 +271,20 @@ export class ShiftService {
     } catch (e: unknown) {
       return serviceErr('database_error', e)
     }
+  }
+
+  async listShifts(): Promise<ServiceResult<ShiftRow[]>> {
+    try { return serviceOk(listShifts(this.deps.database)) } catch (e) { return serviceErr('database_error', e) }
+  }
+
+  async getShift(shiftId: string): Promise<ServiceResult<ShiftRow>> {
+    try {
+      const shift = getShift(this.deps.database, shiftId)
+      return shift === undefined ? serviceErr('not_found') : serviceOk(shift)
+    } catch (e) { return serviceErr('database_error', e) }
+  }
+
+  async listExpenses(shiftId?: string): Promise<ServiceResult<ExpenseRow[]>> {
+    try { return serviceOk(listExpenses(this.deps.database, shiftId)) } catch (e) { return serviceErr('database_error', e) }
   }
 }

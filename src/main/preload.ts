@@ -1,10 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AdjustInput,
+  CashMoveInput,
   CompleteSaleInput,
   CountItemInput,
   CustomerInput,
   DamageInput,
+  ExpenseInput,
   IpcApi,
   IpcChannel,
   IpcResult,
@@ -89,6 +91,12 @@ const api: IpcApi = {
     current: () => invoke('shifts:current'),
     open: (input: { openingCashPiasters: number }) => invoke('shifts:open', input),
     close: (input: { shiftId: string; countedCashPiasters: number; closingNotes?: string | null }) => invoke('shifts:close', input),
+    list: () => invoke('shifts:list'),
+    get: (shiftId: string) => invoke('shifts:get', { shiftId }),
+    recordExpense: (input: ExpenseInput) => invoke('shifts:record-expense', input),
+    cashIn: (input: CashMoveInput) => invoke('shifts:cash-in', input),
+    cashOut: (input: CashMoveInput) => invoke('shifts:cash-out', input),
+    listExpenses: (shiftId?: string) => invoke('shifts:list-expenses', { shiftId }),
   },
 
   payments: {

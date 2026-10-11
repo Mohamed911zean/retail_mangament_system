@@ -546,6 +546,65 @@ export const operations: Record<IpcChannel, OperationSpec> = {
       })
     },
   },
+  'shifts:list': {
+    auth: true,
+    mutating: false,
+    handle: async (context) => context.services.shifts.listShifts(),
+  },
+  'shifts:get': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.shifts.getShift(v.id(input.shiftId, 'shiftId'))
+    },
+  },
+  'shifts:record-expense': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.shifts.recordExpense(requireActor(context), {
+        shiftId: v.id(input.shiftId, 'shiftId'),
+        category: v.string(input.category, 'category', { max: 120 }),
+        description: v.string(input.description, 'description', { max: 300 }),
+        amountPiasters: v.money(input.amountPiasters, 'amountPiasters', { min: 1 }),
+        paymentMethod: v.paymentMethod(input.paymentMethod, 'paymentMethod'),
+      })
+    },
+  },
+  'shifts:cash-in': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.shifts.recordCashIn(requireActor(context), {
+        shiftId: v.id(input.shiftId, 'shiftId'),
+        amountPiasters: v.money(input.amountPiasters, 'amountPiasters', { min: 1 }),
+        referenceText: v.optionalText(input.referenceText, 'referenceText', { max: 300 }) ?? null,
+      })
+    },
+  },
+  'shifts:cash-out': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.shifts.recordCashOut(requireActor(context), {
+        shiftId: v.id(input.shiftId, 'shiftId'),
+        amountPiasters: v.money(input.amountPiasters, 'amountPiasters', { min: 1 }),
+        referenceText: v.optionalText(input.referenceText, 'referenceText', { max: 300 }) ?? null,
+      })
+    },
+  },
+  'shifts:list-expenses': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.shifts.listExpenses(v.optionalId(input.shiftId, 'shiftId') ?? undefined)
+    },
+  },
 
   // ── Payments ──────────────────────────────────────────────────────────────
   'payments:receipt': {
