@@ -44,6 +44,8 @@ src/
                              with receipts, statement and reversals
     inventory/               shelves: stock with value, adjust/damage, counts
                              (draft then post), expiry list, review list
+    treasury/                drawer: expenses with void, manual cash moves,
+                             shift history with the difference view
       DesignSystemPage.tsx     dev-only gallery (a lazy chunk in dev builds only)
 ```
 
@@ -119,7 +121,7 @@ Rules that keep it honest:
 Built: the shell, navigation, login/first-run setup, Home, Settings (appearance,
 feature flags + presets, printing, backup/restore, licence), the POS screen, the
 products + categories screen, the purchases + suppliers screen, the customers
-screen, the inventory screen, and the dev gallery.
+screen, the inventory screen, the treasury screen, and the dev gallery.
 
 Not built yet (they render an explicit "coming soon" panel, never a blank screen):
 sales, reports.

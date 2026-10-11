@@ -166,3 +166,31 @@ one below its low-stock threshold, one with trackExpiry and a dated batch.
 ### NOT verified by the AI in the real GUI
 - RTL layout of all tabs and dialogs at 1280×720 and 1366×768.
 - Full keyboard flow. Expiry "now" is page-load time (badges refresh on reload).
+
+## Screen 5 — Treasury (`3b3993b`, IPC `6bf5358`)
+
+Setup: log in as owner/manager. Open a shift in the POS screen first for cash
+moves and cash expenses.
+
+### Expenses tab (المصروفات)
+- [ ] Empty state shows "لا توجد مصروفات بعد" with "مصروف جديد".
+- [ ] "مصروف جديد": category + description required, amount, method → toast
+      "تم تسجيل المصروف", row appears with "مسجّل" badge.
+- [ ] Without an open shift: info "لا توجد وردية مفتوحة..." instead of a form.
+- [ ] Search filters by category and description.
+- [ ] Void (owner/manager): reason required, yes/no confirm, toast
+      "تم إلغاء المصروف", badge becomes "ملغي".
+- [ ] "إيداع نقدية" / "سحب نقدية": amount + mandatory reason → toast
+      "تم تسجيل الحركة". Empty reason is blocked.
+
+### Shifts tab (سجل الورديات)
+- [ ] Lists shifts newest-first: opened/closed dates, opening, expected,
+      counted, difference + badge (مطابق/زيادة/عجز), status badge.
+- [ ] Open shift shows "مفتوحة" with "—" for expected/counted/difference.
+- [ ] Empty state "لا توجد ورديات بعد" before the first shift.
+- [ ] Close a shift in POS with a counted mismatch, reopen this tab: the
+      difference and badge match the POS reconciliation.
+
+### NOT verified by the AI in the real GUI
+- RTL layout of both tabs and all dialogs at 1280×720 and 1366×768.
+- Full keyboard flow. Cash-move history has no list (covered by shift close).
