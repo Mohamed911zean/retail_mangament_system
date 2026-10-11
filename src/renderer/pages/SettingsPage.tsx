@@ -1,4 +1,5 @@
 import type { LicenseStatus } from '../../shared/license/api'
+import type { CurrentUser } from '../../shared/ipc'
 import { Card, Toggle } from '../components/ui'
 import { messages } from '../i18n'
 import type { Preferences } from '../lib/preferences'
@@ -6,8 +7,10 @@ import { BackupSection } from './settings/BackupSection'
 import { FeaturesSection } from './settings/FeaturesSection'
 import { LicenseSection } from './settings/LicenseSection'
 import { PrintingSection } from './settings/PrintingSection'
+import { UsersSection } from './settings/UsersSection'
 
 export type SettingsPageProps = {
+  user: CurrentUser
   preferences: Preferences
   onPreferencesChange: (preferences: Preferences) => void
   licenseStatus: LicenseStatus | null
@@ -24,6 +27,7 @@ export type SettingsPageProps = {
  * write, no migration and no backup.
  */
 export function SettingsPage({
+  user,
   preferences,
   onPreferencesChange,
   licenseStatus,
@@ -55,6 +59,10 @@ export function SettingsPage({
 
       <Card>
         <PrintingSection preferences={preferences} onPreferencesChange={onPreferencesChange} />
+      </Card>
+
+      <Card>
+        <UsersSection currentUser={user} />
       </Card>
 
       <Card>

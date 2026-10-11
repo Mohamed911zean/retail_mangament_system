@@ -4,6 +4,7 @@ import { Alert, Button, Field, TextInput } from '../../components/ui'
 import { messages, translate } from '../../i18n'
 import { formatDateTime } from '../../lib/format'
 import { useToast } from '../../lib/toast'
+import { licenseDaysLeft } from './licenseStatus'
 
 /** Licence `state` (kebab-case) → the Arabic sentence the shop owner reads. */
 const STATE_MESSAGES: Record<LicenseStatus['state'], string> = {
@@ -38,6 +39,9 @@ export function LicenseSection({
   const toast = useToast()
 
   const active = status?.mode === 'active'
+  // Clock for the countdown, read once so re-renders cannot flicker it.
+  const [nowMs] = useState(() => Date.now())
+  const daysLeft = status?.expiresAt === undefined ? null : licenseDaysLeft(status.expiresAt, nowMs)
 
   async function handleActivate(): Promise<void> {
     if (key.trim().length === 0) return
@@ -58,6 +62,12 @@ export function LicenseSection({
       <h2 className="text-h3 font-semibold text-ink">{messages.license.title}</h2>
 
       <Alert tone={active ? 'success' : 'warning'}>{status === null ? messages.license.loading : STATE_MESSAGES[status.state]}</Alert>
+
+      {active && daysLeft !== null && daysLeft <= 30 && (
+        <Alert tone={daysLeft < 0 ? 'error' : 'warning'}>
+          {messages.license.expiresIn} <span className="numeric">{Math.max(0, daysLeft)}</span> {messages.license.days}
+        </Alert>
+      )}
 
       <div className="flex flex-col gap-2">
         <label htmlFor="license-machine-code" className="text-sm font-semibold text-strong">

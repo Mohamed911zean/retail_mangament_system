@@ -78,6 +78,7 @@ export function AppShell({ user, onLogout, licenseStatus, readOnly, onActivateLi
       case 'settings':
         return (
           <SettingsPage
+            user={user}
             preferences={preferences}
             onPreferencesChange={setPreferences}
             licenseStatus={licenseStatus}

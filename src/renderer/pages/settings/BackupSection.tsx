@@ -137,9 +137,12 @@ export function BackupSection({ readOnly }: { readOnly: boolean }) {
           </>
         }
       >
-        <p className="numeric text-base text-ink">
-          <bdi>{selected}</bdi>
-        </p>
+        <div className="flex flex-col gap-3">
+          <p className="numeric text-base text-ink">
+            <bdi>{selected}</bdi>
+          </p>
+          <Alert tone="warning">{messages.backup.restoreSequences}</Alert>
+        </div>
       </Dialog>
     </section>
   )
