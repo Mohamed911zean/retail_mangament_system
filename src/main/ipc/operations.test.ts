@@ -751,3 +751,97 @@ describe('runOperation — expenses, cash moves and shift history over IPC', () 
     expect(error.code).toBe('invalid_shift_state')
   })
 })
+
+describe('runOperation — reports over IPC', () => {
+  it('reports sales, profit and stock value with hand-checked arithmetic', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const product = expectSuccess(
+      await runOperation(
+        'catalog:create-product',
+        { name: 'شاي', baseUnitName: 'piece', qtyScale: 0, costPricePiasters: 1000, sellingPricePiasters: 1500 },
+        context,
+      ),
+    ) as { id: string }
+    const supplier = expectSuccess(await runOperation('suppliers:create', { name: 'مورد' }, context)) as { id: string }
+
+    // 10 units @ 1000 on credit: stock value 10000, supplier due 10000.
+    expectSuccess(
+      await runOperation(
+        'purchases:receive',
+        {
+          supplierId: supplier.id,
+          lines: [{ productId: product.id, unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 10, unitCostPiasters: 1000 }],
+          tenders: [],
+          taxEnabled: false,
+        },
+        context,
+      ),
+    )
+
+    expectSuccess(await runOperation('shifts:open', { openingCashPiasters: 0 }, context))
+
+    // 2 units @ 1500 cash: revenue 3000, cost 2000, profit 1000.
+    expectSuccess(
+      await runOperation(
+        'sales:complete',
+        {
+          lines: [{ productId: product.id, unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 2, unitPricePiasters: 1500 }],
+          tenders: [{ method: 'cash', amountPiasters: 3000 }],
+          taxEnabled: false,
+          cashRoundingStep: 0,
+        },
+        context,
+      ),
+    )
+
+    const range = { fromMs: 0, toMs: 1700000000001 }
+
+    const sales = expectSuccess(await runOperation('reports:sales', range, context)) as { totalPiasters: number }[]
+    expect(sales).toHaveLength(1)
+    expect(sales[0].totalPiasters).toBe(3000)
+
+    const profit = expectSuccess(await runOperation('reports:profit', range, context)) as {
+      revenuePiasters: number
+      discountPiasters: number
+      costPiasters: number
+      grossProfitPiasters: number
+      marginBps: number
+      salesLines: number
+      returnItems: number
+    }
+    expect(profit.revenuePiasters).toBe(3000)
+    expect(profit.discountPiasters).toBe(0)
+    expect(profit.costPiasters).toBe(2000)
+    expect(profit.grossProfitPiasters).toBe(1000)
+    expect(profit.marginBps).toBe(3333)
+    expect(profit.salesLines).toBe(1)
+    expect(profit.returnItems).toBe(0)
+
+    const stock = expectSuccess(await runOperation('reports:stock-value', {}, context)) as {
+      totalValuePiasters: number
+      needsReview: string[]
+    }
+    expect(stock.totalValuePiasters).toBe(8000)
+    expect(stock.needsReview).toEqual([])
+  })
+
+  it('returns empty reports outside any activity and refuses a backwards range', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const sales = expectSuccess(await runOperation('reports:sales', { fromMs: 1700000000001, toMs: 1700000000002 }, context)) as unknown[]
+    expect(sales).toEqual([])
+
+    const profit = expectSuccess(await runOperation('reports:profit', { fromMs: 1700000000001, toMs: 1700000000002 }, context)) as {
+      revenuePiasters: number
+      grossProfitPiasters: number
+    }
+    expect(profit.revenuePiasters).toBe(0)
+    expect(profit.grossProfitPiasters).toBe(0)
+
+    const backwards = expectFailure(await runOperation('reports:profit', { fromMs: 2000, toMs: 1000 }, context))
+    expect(backwards.code).toBe('invalid_input')
+  })
+})

@@ -13,6 +13,12 @@ export function listSales(database: DatabaseHandle, customerId?: string): SaleRo
   return mapRows<SaleRow>(rows as Record<string, unknown>[])
 }
 
+/** Half-open range: created_at >= fromMs and created_at < toMs. */
+export function listSalesInRange(database: DatabaseHandle, fromMs: number, toMs: number): SaleRow[] {
+  const rows = execute(() => database.prepare('SELECT * FROM sales WHERE created_at >= ? AND created_at < ? ORDER BY created_at,id').all(fromMs, toMs))
+  return mapRows<SaleRow>(rows as Record<string, unknown>[])
+}
+
 export function insertSale(database: DatabaseHandle, row: Partial<SaleRow>): void {
   execute(() => database.prepare(`
     INSERT INTO sales (id,invoice_number,customer_id,user_id,shift_id,subtotal_piasters,line_discount_piasters,
@@ -31,6 +37,17 @@ export function insertSale(database: DatabaseHandle, row: Partial<SaleRow>): voi
 
 export function listSaleItems(database: DatabaseHandle, saleId: string): SaleItemRow[] {
   return mapRows<SaleItemRow>(execute(() => database.prepare('SELECT * FROM sale_items WHERE sale_id = ? ORDER BY id').all(saleId)) as Record<string, unknown>[])
+}
+
+/** Lines whose sale falls in the half-open range, each carrying its sale status. */
+export function listSaleItemsInRange(database: DatabaseHandle, fromMs: number, toMs: number): (SaleItemRow & { saleStatus: string })[] {
+  const rows = execute(() => database.prepare(`
+    SELECT si.*, s.status AS sale_status
+    FROM sale_items si JOIN sales s ON s.id = si.sale_id
+    WHERE s.created_at >= ? AND s.created_at < ?
+    ORDER BY s.created_at,si.id
+  `).all(fromMs, toMs))
+  return mapRows<SaleItemRow & { saleStatus: string }>(rows as Record<string, unknown>[])
 }
 
 export function insertSaleItem(database: DatabaseHandle, row: Partial<SaleItemRow>): void {

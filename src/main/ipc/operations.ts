@@ -114,6 +114,14 @@ function parseVoidInput(payload: unknown) {
   }
 }
 
+function parseReportRange(payload: unknown) {
+  const input = v.payload(payload)
+  return {
+    fromMs: v.integer(input.fromMs, 'fromMs', { min: 0 }),
+    toMs: v.integer(input.toMs, 'toMs', { min: 0 }),
+  }
+}
+
 /**
  * The wire format calls a percentage discount `percent`/`basisPoints`; the domain
  * calls the same thing `percentage`/`rateBps`. Translating in one place keeps the
@@ -870,6 +878,23 @@ export const operations: Record<IpcChannel, OperationSpec> = {
     mutating: true,
     handle: async (context, payload) =>
       context.services.voids.voidExpense(requireActor(context), parseVoidInput(payload)),
+  },
+
+  // ── Reports ───────────────────────────────────────────────────────────────
+  'reports:sales': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => context.services.reports.listSalesInRange(parseReportRange(payload)),
+  },
+  'reports:profit': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => context.services.reports.getProfitReport(parseReportRange(payload)),
+  },
+  'reports:stock-value': {
+    auth: true,
+    mutating: false,
+    handle: async (context) => context.services.reports.getStockValueReport(),
   },
 
   // ── Settings ──────────────────────────────────────────────────────────────

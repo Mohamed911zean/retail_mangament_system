@@ -31,6 +31,28 @@ export function getOnHand(database: DatabaseHandle, productId: string): { qty: n
   return execute(() => database.prepare('SELECT COALESCE(SUM(qty_delta),0) AS qty, COALESCE(SUM(value_delta_piasters),0) AS valuePiasters FROM stock_movements WHERE product_id = ?').get(productId)) as { qty: number; valuePiasters: number }
 }
 
+/** Net revaluation (negative-stock settlement) value posted in the half-open range. */
+export function sumRevaluationInRange(database: DatabaseHandle, fromMs: number, toMs: number): number {
+  const row = execute(() => database.prepare(
+    `SELECT COALESCE(SUM(value_delta_piasters),0) AS total FROM stock_movements
+     WHERE movement_type = 'revaluation' AND occurred_at >= ? AND occurred_at < ?`,
+  ).get(fromMs, toMs)) as { total: number }
+  return row.total
+}
+
+/** Restocked value per return-item id, from the `sale_return` movements that restocked them. */
+export function sumRestockValueByReturnItem(database: DatabaseHandle, returnItemIds: string[]): Map<string, number> {
+  const sums = new Map<string, number>()
+  if (returnItemIds.length === 0) return sums
+  const placeholders = returnItemIds.map(() => '?').join(',')
+  const rows = execute(() => database.prepare(
+    `SELECT reference_id AS referenceId, COALESCE(SUM(value_delta_piasters),0) AS total FROM stock_movements
+     WHERE movement_type = 'sale_return' AND reference_id IN (${placeholders}) GROUP BY reference_id`,
+  ).all(...returnItemIds)) as { referenceId: string; total: number }[]
+  for (const row of rows) sums.set(row.referenceId, row.total)
+  return sums
+}
+
 export function insertStockMovement(database: DatabaseHandle, row: Partial<StockMovementRow>): void {
   execute(() => database.prepare(`
     INSERT INTO stock_movements (id,product_id,batch_id,qty_delta,value_delta_piasters,movement_type,reverses_movement_id,reference_type,reference_id,occurred_at,reason,created_by_user_id,created_at,updated_at,device_id)

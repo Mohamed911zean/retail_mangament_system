@@ -35,6 +35,17 @@ export function listSaleReturnItems(database: DatabaseHandle, saleReturnId: stri
   return mapRows<SaleReturnItemRow>(execute(() => database.prepare('SELECT * FROM sale_return_items WHERE sale_return_id = ? ORDER BY id').all(saleReturnId)) as Record<string, unknown>[])
 }
 
+/** Return lines whose return falls in the half-open range, each carrying its return status. */
+export function listSaleReturnItemsInRange(database: DatabaseHandle, fromMs: number, toMs: number): (SaleReturnItemRow & { returnStatus: string })[] {
+  const rows = execute(() => database.prepare(`
+    SELECT sri.*, sr.status AS return_status
+    FROM sale_return_items sri JOIN sale_returns sr ON sr.id = sri.sale_return_id
+    WHERE sr.created_at >= ? AND sr.created_at < ?
+    ORDER BY sr.created_at,sri.id
+  `).all(fromMs, toMs))
+  return mapRows<SaleReturnItemRow & { returnStatus: string }>(rows as Record<string, unknown>[])
+}
+
 export function insertSaleReturnItem(database: DatabaseHandle, row: Partial<SaleReturnItemRow>): void {
   execute(() => database.prepare(`
     INSERT INTO sale_return_items (id,sale_return_id,sale_item_id,product_id,qty_base,refund_piasters,condition,created_at,updated_at,device_id)

@@ -240,6 +240,24 @@ export type ExpenseInput = {
 
 export type CashMoveInput = { shiftId: string; amountPiasters: number; referenceText?: string | null }
 
+export type ReportRangeInput = { fromMs: number; toMs: number }
+
+export type ProfitReport = {
+  revenuePiasters: number
+  discountPiasters: number
+  costPiasters: number
+  grossProfitPiasters: number
+  marginBps: number
+  salesLines: number
+  returnItems: number
+}
+
+export type StockValueReport = {
+  totalValuePiasters: number
+  breakdown: { productId: string; onHandQty: number; onHandValuePiasters: number }[]
+  needsReview: string[]
+}
+
 // ─── Channels ───────────────────────────────────────────────────────────────
 
 /** Every channel the preload is allowed to invoke. Nothing else is exposed. */
@@ -326,6 +344,10 @@ export const IPC_CHANNELS = [
   'voids:void-purchase',
   'voids:void-sale-return',
   'voids:void-expense',
+
+  'reports:sales',
+  'reports:profit',
+  'reports:stock-value',
 
   'settings:get',
   'settings:set',
@@ -444,6 +466,14 @@ export type IpcApi = {
     voidPurchase: (input: VoidDocumentInput) => Promise<IpcResult<{ id: string }>>
     voidSaleReturn: (input: VoidDocumentInput) => Promise<IpcResult<{ id: string }>>
     voidExpense: (input: VoidDocumentInput) => Promise<IpcResult<{ id: string }>>
+  }
+  reports: {
+    /** Finalized invoice rows in the half-open range (completed and voided). */
+    sales: (input: ReportRangeInput) => Promise<IpcResult<SaleRow[]>>
+    /** Revenue, discounts, cost and gross profit via the pure profit function. */
+    profit: (input: ReportRangeInput) => Promise<IpcResult<ProfitReport>>
+    /** Total on-hand value plus the ids that need review. */
+    stockValue: () => Promise<IpcResult<StockValueReport>>
   }
   settings: {
     get: () => Promise<IpcResult<Settings>>
