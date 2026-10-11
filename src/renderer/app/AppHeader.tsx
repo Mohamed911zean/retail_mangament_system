@@ -31,7 +31,7 @@ export function AppHeader({ title, description, user, onLogout }: AppHeaderProps
   }
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-6">
+    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-6 print:hidden">
       <div className="min-w-0">
         <h1 className="truncate text-h2 font-semibold text-ink">{title}</h1>
         {description !== undefined && <p className="truncate text-sm text-secondary">{description}</p>}

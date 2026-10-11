@@ -29,7 +29,7 @@ export function Sidebar({ items, active, onNavigate, collapsed, onToggleCollapse
     <nav
       aria-label={messages.nav.menuLabel}
       style={{ width }}
-      className="flex shrink-0 flex-col border-e border-line bg-surface"
+      className="flex shrink-0 flex-col border-e border-line bg-surface print:hidden"
     >
       <div className="flex h-16 items-center gap-2 border-b border-line px-4">
         <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-700 text-base font-bold text-surface">
