@@ -360,11 +360,11 @@ export function PurchasesPage({ user, preferences, initialTab }: PurchasesPagePr
             <TRow>
               <TH numeric>{messages.purchases.invoiceNumber}</TH>
               <TH>{messages.purchases.supplier}</TH>
-              <TH>{messages.purchases.date}</TH>
+              <TH numeric>{messages.purchases.date}</TH>
               <TH numeric>{messages.purchases.total}</TH>
               <TH numeric>{messages.purchases.paid}</TH>
               <TH numeric>{messages.purchases.due}</TH>
-              <TH>{messages.purchases.actions}</TH>
+              <TH end>{messages.purchases.actions}</TH>
             </TRow>
           </THead>
           <tbody>
@@ -448,7 +448,7 @@ export function PurchasesPage({ user, preferences, initialTab }: PurchasesPagePr
             <TRow>
               <TH>{messages.suppliers.name}</TH>
               <TH numeric>{messages.suppliers.balance}</TH>
-              <TH>{messages.purchases.actions}</TH>
+              <TH end>{messages.purchases.actions}</TH>
             </TRow>
           </THead>
           <tbody>
@@ -474,7 +474,7 @@ export function PurchasesPage({ user, preferences, initialTab }: PurchasesPagePr
                   <TRow key={supplier.id}>
                     <TD>
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-strong">{supplier.name}</p>
+                        <p className="truncate font-semibold text-strong" title={supplier.name}>{supplier.name}</p>
                         {supplier.phone !== null && <p className="numeric text-sm text-muted">{supplier.phone}</p>}
                       </div>
                     </TD>

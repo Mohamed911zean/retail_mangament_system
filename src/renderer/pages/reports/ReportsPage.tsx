@@ -255,7 +255,7 @@ export function ReportsPage({ preferences }: ReportsPageProps) {
         <Table>
           <THead>
             <TRow>
-              <TH>{messages.reports.day}</TH>
+              <TH numeric>{messages.reports.day}</TH>
               <TH numeric>{messages.reports.invoices}</TH>
               <TH numeric>{messages.reports.revenue}</TH>
               <TH numeric>{messages.reports.paid}</TH>
@@ -343,7 +343,7 @@ export function ReportsPage({ preferences }: ReportsPageProps) {
               {lowStock.map((product) => (
                 <TRow key={product.id}>
                   <TD>
-                    <p className="truncate font-semibold text-strong">{product.name}</p>
+                    <p className="truncate font-semibold text-strong" title={product.name}>{product.name}</p>
                   </TD>
                   <TD numeric>{formatQty(product.onHandQty, product.qtyScale, product.baseUnitName, digitStyle)}</TD>
                   <TD numeric>{formatMoney(product.onHandValuePiasters, digitStyle)}</TD>
@@ -381,7 +381,7 @@ export function ReportsPage({ preferences }: ReportsPageProps) {
               {expiredRows.map(({ productId, batch }) => (
                 <TRow key={batch.id}>
                   <TD>
-                    <p className="truncate font-semibold text-strong">{productsById.get(productId)?.name ?? productId}</p>
+                    <p className="truncate font-semibold text-strong" title={productsById.get(productId)?.name ?? productId}>{productsById.get(productId)?.name ?? productId}</p>
                   </TD>
                   <TD numeric>{batch.expiryAt === null ? messages.common.emptyValue : formatDate(batch.expiryAt, digitStyle)}</TD>
                 </TRow>
@@ -425,7 +425,7 @@ export function ReportsPage({ preferences }: ReportsPageProps) {
               owing.map((customer) => (
                 <TRow key={customer.id}>
                   <TD>
-                    <p className="truncate font-semibold text-strong">{customer.name}</p>
+                    <p className="truncate font-semibold text-strong" title={customer.name}>{customer.name}</p>
                   </TD>
                   <TD numeric>{formatMoney(customer.balancePiasters, digitStyle)}</TD>
                 </TRow>
@@ -447,7 +447,7 @@ export function ReportsPage({ preferences }: ReportsPageProps) {
               payable.map((supplier) => (
                 <TRow key={supplier.id}>
                   <TD>
-                    <p className="truncate font-semibold text-strong">{supplier.name}</p>
+                    <p className="truncate font-semibold text-strong" title={supplier.name}>{supplier.name}</p>
                   </TD>
                   <TD numeric>{formatMoney(supplierBalances.get(supplier.id) ?? 0, digitStyle)}</TD>
                 </TRow>

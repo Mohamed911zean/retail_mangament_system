@@ -265,6 +265,16 @@ Setup: log in as owner. The Settings page is hidden for cashiers.
 - [ ] Completed invoices show no such section.
 - [ ] Unknown/deleted voiding user shows "—" instead of a blank.
 
+## Item 3 — Table audit (1366×768 RTL)
+
+- [ ] Every table header aligns with its column: dates/amounts end-aligned,
+      action headers sit over the end-side buttons.
+- [ ] Long product/customer/supplier names show the full text on hover.
+- [ ] A selectable row (backup list, POS cart) is reachable by Tab and toggles
+      with Enter/Space; typing Space inside a quantity field does not select.
+- [ ] Amount columns never wrap mid-number on a 1280px window; the table
+      scrolls inside its container instead.
+
 
 ## ----- SOME NOTICIES : 
 

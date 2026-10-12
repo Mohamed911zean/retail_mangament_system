@@ -387,7 +387,7 @@ function UnitsSection({
           {product.units.map((unit: ProductUnitRow) => (
             <li key={unit.id} className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-2">
               <div className="min-w-0">
-                <p className="truncate text-base text-strong">{unit.unitName}</p>
+                <p className="truncate text-base text-strong" title={unit.unitName}>{unit.unitName}</p>
                 <p className="numeric text-sm text-muted">
                   {formatQty(unit.baseQtyPerUnit, product.qtyScale, product.baseUnitName, digitStyle)}
                   {' · '}

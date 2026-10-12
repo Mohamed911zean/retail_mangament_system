@@ -161,8 +161,8 @@ export function UsersSection({ currentUser }: { currentUser: CurrentUser }) {
             <TH>{messages.users.username}</TH>
             <TH>{messages.users.displayName}</TH>
             <TH>{messages.users.role}</TH>
-            <TH>{messages.users.lastLogin}</TH>
-            <TH>{messages.users.actions}</TH>
+            <TH numeric>{messages.users.lastLogin}</TH>
+            <TH end>{messages.users.actions}</TH>
           </TRow>
         </THead>
         <tbody>
@@ -175,8 +175,8 @@ export function UsersSection({ currentUser }: { currentUser: CurrentUser }) {
               const isSelf = entry.id === currentUser.id
               return (
                 <TRow key={entry.id}>
-                  <TD>
-                    <p className="numeric font-semibold text-strong">{entry.username}</p>
+                  <TD numeric>
+                    <p className="font-semibold text-strong">{entry.username}</p>
                   </TD>
                   <TD>{entry.displayName}</TD>
                   <TD>

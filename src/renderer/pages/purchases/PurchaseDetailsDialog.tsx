@@ -116,7 +116,7 @@ export function PurchaseDetailsDialog({
                   <TRow key={item.id}>
                     <TD>
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-strong">{product?.name ?? item.productId}</p>
+                        <p className="truncate font-semibold text-strong" title={product?.name ?? item.productId}>{product?.name ?? item.productId}</p>
                         {item.batchCodeSnapshot !== null && <p className="numeric text-sm text-muted">{item.batchCodeSnapshot}</p>}
                       </div>
                     </TD>

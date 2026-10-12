@@ -108,6 +108,30 @@ Rules that keep it honest:
    primitive or the token instead.
 7. **Every flow is keyboard-operable** with a visible focus ring (§4.2).
 
+## Table audit (1366×768 RTL, owner notice round)
+
+Audited the shared `Table` primitives and every table in the app; fixed once
+in the shared component, then at the usages:
+
+- **Shared (`Table.tsx`, `app.css`).** `.numeric` no longer wraps, so amount
+  columns keep a stable width instead of squeezing neighbours at 1280px.
+  `TRow` with `onClick` is keyboard-operable (Tab stop, Enter/Space, inner
+  controls excluded so Space in a quantity field still edits the number).
+  `TH` takes an `end` prop for action columns whose buttons sit at the row
+  end — passed as a prop, not a `text-end` class, because `cn()` does not
+  resolve the conflict with the base `text-start`.
+- **Header/cell alignment.** Date columns were `numeric` cells under plain
+  headers (treasury ×2, purchases, reports, users, inventory counts) — headers
+  are `numeric` now. Action headers use `end` (products, purchases ×2,
+  customers, inventory ×2, treasury, users).
+- **Truncation.** Every truncated data text carries a `title` tooltip with the
+  full value (names, descriptions, reference notes, dialog headers).
+- **Kept as-is (conservative).** Sticky header, `px-3 py-2` paddings, hover
+  tint, per-table `TableEmpty` states and container scrolling were already
+  correct everywhere. Icon-only action columns keep the `sr-only` header
+  pattern (POS cart, held sales). Sidebar/header chrome truncation untouched:
+  nav buttons already expose `title` tooltips.
+
 ## Adding a screen
 
 1. Add the key and its label to `app/navigation.ts` (`NavItem`), with `built: true`.

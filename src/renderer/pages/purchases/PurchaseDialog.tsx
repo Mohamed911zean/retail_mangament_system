@@ -245,7 +245,7 @@ export function PurchaseDialog({
                     <TRow key={line.key}>
                       <TD>
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-strong">{product?.name ?? line.productId}</p>
+                          <p className="truncate font-semibold text-strong" title={product?.name ?? line.productId}>{product?.name ?? line.productId}</p>
                           {line.batchCode !== '' && <p className="numeric text-sm text-muted">{line.batchCode}</p>}
                         </div>
                       </TD>

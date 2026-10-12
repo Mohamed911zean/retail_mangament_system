@@ -80,7 +80,7 @@ export function CustomerDetailsDialog({
 
           <div className="flex items-center justify-between gap-4 rounded-lg border border-line bg-panel px-4 py-3">
             <div className="min-w-0">
-              <p className="truncate text-h3 font-semibold text-ink">{customer.name}</p>
+              <p className="truncate text-h3 font-semibold text-ink" title={customer.name}>{customer.name}</p>
               {customer.phone !== null && <p className="numeric text-sm text-muted">{customer.phone}</p>}
               <p className="text-sm text-secondary">
                 {messages.customers.creditLimit}:{' '}
@@ -157,7 +157,7 @@ export function CustomerDetailsDialog({
                           {formatDateTime(entry.occurredAt, digitStyle)}
                           {entry.paymentMethod !== null && ` · ${messages.paymentMethods[entry.paymentMethod as PaymentMethod] ?? entry.paymentMethod}`}
                         </p>
-                        {entry.referenceText !== null && <p className="truncate text-sm text-secondary">{entry.referenceText}</p>}
+                        {entry.referenceText !== null && <p className="truncate text-sm text-secondary" title={entry.referenceText}>{entry.referenceText}</p>}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="numeric text-base font-semibold text-ink">{formatMoney(entry.amountPiasters, digitStyle)}</span>

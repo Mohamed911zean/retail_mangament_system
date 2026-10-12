@@ -188,7 +188,7 @@ export function CustomersPage({ user, preferences }: CustomersPageProps) {
             <TH>{messages.customers.name}</TH>
             <TH numeric>{messages.customers.balance}</TH>
             <TH>{messages.customers.creditLimit}</TH>
-            {canManage && <TH>{messages.customers.actions}</TH>}
+            {canManage && <TH end>{messages.customers.actions}</TH>}
           </TRow>
         </THead>
         <tbody>
@@ -212,7 +212,7 @@ export function CustomersPage({ user, preferences }: CustomersPageProps) {
               <TRow key={customer.id}>
                 <TD>
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-strong">{customer.name}</p>
+                    <p className="truncate font-semibold text-strong" title={customer.name}>{customer.name}</p>
                     {customer.phone !== null && <p className="numeric text-sm text-muted">{customer.phone}</p>}
                   </div>
                 </TD>

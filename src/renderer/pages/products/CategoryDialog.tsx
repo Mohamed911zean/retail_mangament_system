@@ -117,7 +117,7 @@ export function CategoryDialog({ open, categories, saving, errorText, onClose, o
               </li>
             ) : (
               <li key={category.id} className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-2">
-                <span className="min-w-0 truncate text-base text-strong">{category.name}</span>
+                <span className="min-w-0 truncate text-base text-strong" title={category.name}>{category.name}</span>
                 {confirmId === category.id ? (
                   <div className="flex shrink-0 items-center gap-2">
                     <Button

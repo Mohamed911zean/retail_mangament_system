@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useCallback, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 
 /**
@@ -31,9 +31,24 @@ export function TRow({
   onClick?: () => void
   className?: string
 }) {
+  // A clickable row is also a keyboard row: without this, selecting a backup
+  // or a cart line is mouse-only. Keys from inner controls are ignored — Space
+  // inside a quantity field must edit the number, not select the row.
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTableRowElement>) => {
+      if (onClick === undefined || event.target !== event.currentTarget) return
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        onClick()
+      }
+    },
+    [onClick],
+  )
   return (
     <tr
       onClick={onClick}
+      onKeyDown={onClick === undefined ? undefined : handleKeyDown}
+      tabIndex={onClick === undefined ? undefined : 0}
       aria-selected={onClick === undefined ? undefined : selected}
       className={cn(
         'border-b border-line last:border-b-0',
@@ -47,9 +62,20 @@ export function TRow({
   )
 }
 
-export function TH({ children, numeric = false, className }: { children?: ReactNode; numeric?: boolean; className?: string }) {
+export function TH({
+  children,
+  numeric = false,
+  end = false,
+  className,
+}: {
+  children?: ReactNode
+  numeric?: boolean
+  /** End-aligned header for action columns whose buttons sit at the row end. */
+  end?: boolean
+  className?: string
+}) {
   return (
-    <th scope="col" className={cn('border-b border-line px-3 py-2 text-start text-dense font-semibold text-strong', numeric && 'numeric', className)}>
+    <th scope="col" className={cn('border-b border-line px-3 py-2 font-semibold text-strong', end ? 'text-end' : 'text-start', 'text-dense', numeric && 'numeric', className)}>
       {children}
     </th>
   )

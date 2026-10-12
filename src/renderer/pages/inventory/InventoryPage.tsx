@@ -279,7 +279,7 @@ export function InventoryPage({ user, preferences }: InventoryPageProps) {
               <TH>{messages.inventory.product}</TH>
               <TH numeric>{messages.inventory.onHand}</TH>
               <TH numeric>{messages.inventory.value}</TH>
-              {canManage && <TH>{messages.inventory.actions}</TH>}
+              {canManage && <TH end>{messages.inventory.actions}</TH>}
             </TRow>
           </THead>
           <tbody>
@@ -292,7 +292,7 @@ export function InventoryPage({ user, preferences }: InventoryPageProps) {
                 <TRow key={product.id}>
                   <TD>
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-strong">{product.name}</p>
+                      <p className="truncate font-semibold text-strong" title={product.name}>{product.name}</p>
                       {product.sku !== null && <p className="numeric text-sm text-muted">{product.sku}</p>}
                     </div>
                   </TD>
@@ -367,9 +367,9 @@ export function InventoryPage({ user, preferences }: InventoryPageProps) {
         <Table>
           <THead>
             <TRow>
-              <TH>{messages.purchases.date}</TH>
+              <TH numeric>{messages.purchases.date}</TH>
               <TH>{messages.inventory.countNotes}</TH>
-              <TH>{messages.inventory.actions}</TH>
+              <TH end>{messages.inventory.actions}</TH>
             </TRow>
           </THead>
           <tbody>

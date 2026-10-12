@@ -79,7 +79,7 @@ export function SupplierDetailsDialog({
 
           <div className="flex items-center justify-between gap-4 rounded-lg border border-line bg-panel px-4 py-3">
             <div className="min-w-0">
-              <p className="truncate text-h3 font-semibold text-ink">{supplier.name}</p>
+              <p className="truncate text-h3 font-semibold text-ink" title={supplier.name}>{supplier.name}</p>
               {supplier.phone !== null && <p className="numeric text-sm text-muted">{supplier.phone}</p>}
             </div>
             <div className="shrink-0 text-end">
@@ -149,7 +149,7 @@ export function SupplierDetailsDialog({
                           {formatDateTime(entry.occurredAt, digitStyle)}
                           {entry.paymentMethod !== null && ` · ${messages.paymentMethods[entry.paymentMethod as PaymentMethod] ?? entry.paymentMethod}`}
                         </p>
-                        {entry.referenceText !== null && <p className="truncate text-sm text-secondary">{entry.referenceText}</p>}
+                        {entry.referenceText !== null && <p className="truncate text-sm text-secondary" title={entry.referenceText}>{entry.referenceText}</p>}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="numeric text-base font-semibold text-ink">{formatMoney(entry.amountPiasters, digitStyle)}</span>

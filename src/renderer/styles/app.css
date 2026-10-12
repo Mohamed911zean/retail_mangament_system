@@ -99,11 +99,13 @@
   }
 
   /* Money, quantities and barcodes are isolated so a minus or a percent sign
-     never flips in RTL (§6.2). */
+     never flips in RTL (§6.2). They never wrap: a wrapped amount column
+     squeezes its neighbours at 1280px instead of scrolling cleanly. */
   .numeric {
     direction: ltr;
     text-align: end;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   /* Directional icons (arrows, chevrons) mirror in RTL; logos do not (§6.3). */

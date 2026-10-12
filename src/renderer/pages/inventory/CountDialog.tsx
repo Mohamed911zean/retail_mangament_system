@@ -151,7 +151,7 @@ export function CountDialog({ open, count, items, products, digitStyle, saving, 
                     return (
                       <TRow key={item.id}>
                         <TD>
-                          <p className="truncate font-semibold text-strong">{product?.name ?? item.productId}</p>
+                          <p className="truncate font-semibold text-strong" title={product?.name ?? item.productId}>{product?.name ?? item.productId}</p>
                         </TD>
                         <TD numeric>{formatQty(item.expectedQtyBase, product?.qtyScale ?? 0, product?.baseUnitName ?? '', digitStyle)}</TD>
                         <TD numeric>{formatQty(item.countedQtyBase, product?.qtyScale ?? 0, product?.baseUnitName ?? '', digitStyle)}</TD>

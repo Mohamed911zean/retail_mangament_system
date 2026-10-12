@@ -189,7 +189,7 @@ export function ProductsPage({ user, preferences }: ProductsPageProps) {
             <TH numeric>{messages.products.price}</TH>
             {costEditable && <TH numeric>{messages.products.cost}</TH>}
             <TH numeric>{messages.products.stock}</TH>
-            {canManage && <TH>{messages.products.actions}</TH>}
+            {canManage && <TH end>{messages.products.actions}</TH>}
           </TRow>
         </THead>
         <tbody>
@@ -213,7 +213,7 @@ export function ProductsPage({ user, preferences }: ProductsPageProps) {
               <TRow key={product.id}>
                 <TD>
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-strong">{product.name}</p>
+                    <p className="truncate font-semibold text-strong" title={product.name}>{product.name}</p>
                     {product.sku !== null && <p className="numeric text-sm text-muted">{product.sku}</p>}
                   </div>
                 </TD>

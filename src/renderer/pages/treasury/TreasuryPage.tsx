@@ -195,12 +195,12 @@ export function TreasuryPage({ user, preferences }: TreasuryPageProps) {
         <Table>
           <THead>
             <TRow>
-              <TH>{messages.treasury.date}</TH>
+              <TH numeric>{messages.treasury.date}</TH>
               <TH>{messages.treasury.category}</TH>
               <TH>{messages.treasury.description}</TH>
               <TH numeric>{messages.treasury.amount}</TH>
               <TH>{messages.treasury.status}</TH>
-              {canVoid && <TH>{messages.treasury.actions}</TH>}
+              {canVoid && <TH end>{messages.treasury.actions}</TH>}
             </TRow>
           </THead>
           <tbody>
@@ -223,7 +223,7 @@ export function TreasuryPage({ user, preferences }: TreasuryPageProps) {
                   <TD numeric>{formatDateTime(expense.expenseAt, digitStyle)}</TD>
                   <TD>{expense.category}</TD>
                   <TD>
-                    <p className="truncate">{expense.description}</p>
+                    <p className="truncate" title={expense.description}>{expense.description}</p>
                   </TD>
                   <TD numeric>{formatMoney(expense.amountPiasters, digitStyle)}</TD>
                   <TD>
@@ -284,8 +284,8 @@ export function TreasuryPage({ user, preferences }: TreasuryPageProps) {
       <Table>
         <THead>
           <TRow>
-            <TH>{messages.treasury.openedAt}</TH>
-            <TH>{messages.treasury.closedAt}</TH>
+              <TH numeric>{messages.treasury.openedAt}</TH>
+              <TH numeric>{messages.treasury.closedAt}</TH>
             <TH numeric>{messages.treasury.openingCash}</TH>
             <TH numeric>{messages.treasury.expectedCash}</TH>
             <TH numeric>{messages.treasury.countedCash}</TH>
