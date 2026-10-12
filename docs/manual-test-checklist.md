@@ -275,6 +275,35 @@ Setup: log in as owner. The Settings page is hidden for cashiers.
 - [ ] Amount columns never wrap mid-number on a 1280px window; the table
       scrolls inside its container instead.
 
+## Item 4a — Sales history
+
+Setup: log in (any role for viewing). Seed a cash and a credit sale.
+
+- [ ] المبيعات lists invoices newest-first in the range; presets and custom
+      من/إلى change the rows; search matches invoice number and customer name.
+- [ ] التفاصيل shows stored lines, totals, paid/due; voided invoices show the
+      reason, who voided, and when.
+- [ ] Reprint with a configured printer sends the original receipt (toast);
+      without a printer the dialog asks to pick one in Settings.
+- [ ] Void (owner/manager, reason + yes/no): toast, badge becomes ملغاة;
+      voiding an invoice with completed returns is refused inline.
+- [ ] Cashier: list and details visible, no void section.
+
+## Item 4b — Returns
+
+Setup: log in as owner/manager (cashiers may also create returns at the
+counter). Have a completed sale with several units on one line.
+
+- [ ] "مرتجع جديد": invoice-number lookup finds the sale (widen-to-all-time
+      when older than 90 days); unknown numbers show "غير موجودة".
+- [ ] Per line: remaining shown, quantity clamped to it, condition selector,
+      live refund preview; total matches the service math.
+- [ ] Cash field defaults to full refund; lowering it shows the credited
+      remainder; saving shows "تم حفظ المرتجع".
+- [ ] Over-returning is refused with "الكمية المرتجعة تتجاوز الكمية الأصلية".
+- [ ] List/details show number, date, totals split, condition badges; void
+      needs reason + document.void and shows the void record afterwards.
+
 
 ## ----- SOME NOTICIES : 
 

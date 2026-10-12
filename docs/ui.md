@@ -49,6 +49,10 @@ src/
                              shift history with the difference view
     reports/                 figures: daily sales buckets, profit, stock value,
                              balances; range presets, CSV export, print
+    sales/                   history: range + search, stored details, reprint,
+                             void record, terminal void
+    returns/                 invoice lookup, per-line remaining with refund
+                             preview, cash/credit split, list/details/void
       DesignSystemPage.tsx     dev-only gallery (a lazy chunk in dev builds only)
 ```
 
@@ -146,13 +150,12 @@ in the shared component, then at the usages:
 ## What is and is not built
 
 Built: the shell, navigation, login/first-run setup, Home, Settings (appearance,
-feature flags + presets, printing, backup/restore, licence), the POS screen, the
-products + categories screen, the purchases + suppliers screen, the customers
-screen, the inventory screen, the treasury screen, the reports screen, and
-the dev gallery.
+feature flags + presets, printing, backup/restore, licence, users), the POS
+screen, the products + categories screen, the purchases + suppliers screen, the
+customers screen, the inventory screen, the treasury screen, the reports
+screen, the sales history screen, the returns screen, and the dev gallery.
 
-Not built yet (it renders an explicit "coming soon" panel, never a blank screen):
-the sales list. All Phase-2 screens except sales are built.
+No placeholders remain: every sidebar entry renders a real screen.
 
 ## Verifying the UI
 
