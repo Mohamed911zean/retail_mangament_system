@@ -47,7 +47,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'treasury', label: messages.nav.treasury, icon: WalletIcon, built: true },
   { key: 'inventory', label: messages.nav.inventory, icon: ClipboardIcon, built: true },
   { key: 'purchases', label: messages.nav.purchases, icon: TruckIcon, built: true },
-  { key: 'sales', label: messages.nav.sales, icon: ReceiptIcon, built: false },
+  { key: 'sales', label: messages.nav.sales, icon: ReceiptIcon, built: true },
   { key: 'customers', label: messages.nav.customers, icon: UsersIcon, built: true },
   { key: 'suppliers', label: messages.nav.suppliers, icon: StoreIcon, built: true },
   { key: 'reports', label: messages.nav.reports, icon: ChartIcon, built: true },

@@ -16,6 +16,7 @@ import { CustomersPage } from '../pages/customers/CustomersPage'
 import { InventoryPage } from '../pages/inventory/InventoryPage'
 import { TreasuryPage } from '../pages/treasury/TreasuryPage'
 import { ReportsPage } from '../pages/reports/ReportsPage'
+import { SalesPage } from '../pages/sales/SalesPage'
 import { PosPage } from '../pages/pos/PosPage'
 
 /**
@@ -36,7 +37,7 @@ const PAGE_HEADINGS: Record<NavKey, { title: string; description?: string }> = {
   purchases: { title: messages.pages.purchasesTitle },
   suppliers: { title: messages.nav.suppliers },
   customers: { title: messages.pages.customersTitle },
-  sales: { title: messages.nav.sales },
+  sales: { title: messages.pages.salesTitle },
   reports: { title: messages.pages.reportsTitle },
   settings: { title: messages.pages.settingsTitle, description: messages.pages.settingsSubtitle },
   'design-system': { title: messages.nav.designSystem },
@@ -100,6 +101,8 @@ export function AppShell({ user, onLogout, licenseStatus, readOnly, onActivateLi
         return <TreasuryPage user={user} preferences={preferences} />
       case 'reports':
         return <ReportsPage user={user} preferences={preferences} />
+      case 'sales':
+        return <SalesPage user={user} preferences={preferences} />
       case 'inventory':
         return <InventoryPage user={user} preferences={preferences} />
       case 'design-system':
