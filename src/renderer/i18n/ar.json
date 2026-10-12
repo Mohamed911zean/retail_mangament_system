@@ -386,8 +386,7 @@
     "emptyBody": "سجّل أول فاتورة شراء من المورد",
     "batchCode": "رقم التشغيلة",
     "expiryDate": "تاريخ الصلاحية",
-    "expiryHint": "بصيغة سنة/شهر/يوم",
-    "expiryInvalid": "تاريخ غير صالح (سنة/شهر/يوم)"
+    "expiryInvalid": "تاريخ غير صالح"
   },
   "suppliers": {
     "addSupplier": "مورد جديد",

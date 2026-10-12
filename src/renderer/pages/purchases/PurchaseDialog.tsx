@@ -6,7 +6,7 @@ import { formatMoney, formatQty, type DigitStyle } from '../../lib/format'
 import type { ProductSummary, ReceivePurchaseInput } from '../../../shared/ipc'
 import type { PaymentMethod } from '../../../shared/settings'
 import type { SupplierRow } from '../../../shared/rows'
-import { checkPurchasePayment, invoiceTotal, parseExpiryDate } from './purchaseCart'
+import { checkPurchasePayment, invoiceTotal, pickerValueToExpiryMs } from './purchaseCart'
 
 /**
  * A new purchase invoice. The buyer picks a supplier (or none — then the whole
@@ -95,7 +95,9 @@ export function PurchaseDialog({
     setTriedAdd(false)
   }
 
-  const expiryMs = expiryText.trim().length === 0 ? null : parseExpiryDate(expiryText)
+  // The native picker owns the shape (`yyyy-mm-dd`), but what it hands back is
+  // still validated: a half-typed date must not become a wrong stored expiry.
+  const expiryMs = expiryText.trim().length === 0 ? null : pickerValueToExpiryMs(expiryText)
   const expiryInvalid = expiryEnabled && expiryText.trim().length > 0 && expiryMs === null
   const lineReady = picked !== undefined && qty > 0 && !expiryInvalid
 
@@ -129,7 +131,7 @@ export function PurchaseDialog({
       supplierId: supplierId === '' ? null : supplierId,
       lines: lines.map((line) => {
         const product = productsById.get(line.productId)
-        const expiry = line.expiryText === '' ? null : parseExpiryDate(line.expiryText)
+        const expiry = line.expiryText === '' ? null : pickerValueToExpiryMs(line.expiryText)
         return {
           productId: line.productId,
           unitNameSnapshot: product?.baseUnitName ?? '',
@@ -203,12 +205,12 @@ export function PurchaseDialog({
           </div>
           {expiryEnabled && (
             <div className="grid grid-cols-2 items-end gap-3">
-              <Field label={messages.purchases.expiryDate} htmlFor="purchase-expiry" helper={messages.purchases.expiryHint} error={expiryInvalid ? messages.purchases.expiryInvalid : undefined}>
+              <Field label={messages.purchases.expiryDate} htmlFor="purchase-expiry" error={expiryInvalid ? messages.purchases.expiryInvalid : undefined}>
                 <TextInput
                   id="purchase-expiry"
+                  type="date"
                   value={expiryText}
                   onChange={(event) => setExpiryText(event.target.value)}
-                  placeholder={messages.purchases.expiryHint}
                   dir="ltr"
                   className="numeric"
                   error={expiryInvalid}

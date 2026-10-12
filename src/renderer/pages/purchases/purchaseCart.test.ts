@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkPurchasePayment, invoiceTotal, lineTotal, parseExpiryDate } from './purchaseCart'
+import { checkPurchasePayment, expiryMsToPickerValue, invoiceTotal, lineTotal, parseExpiryDate, pickerValueToExpiryMs } from './purchaseCart'
 
 describe('lineTotal', () => {
   it('prices counted and weighed lines like the service', () => {
@@ -53,5 +53,26 @@ describe('parseExpiryDate', () => {
     expect(parseExpiryDate('05/03/2027')).toBeNull()
     expect(parseExpiryDate('tomorrow')).toBeNull()
     expect(parseExpiryDate('')).toBeNull()
+  })
+})
+
+describe('picker expiry conversion', () => {
+  it('round-trips stored UTC midnights through the picker value', () => {
+    expect(expiryMsToPickerValue(Date.UTC(2027, 2, 5))).toBe('2027-03-05')
+    expect(pickerValueToExpiryMs('2027-03-05')).toBe(Date.UTC(2027, 2, 5))
+  })
+
+  it('converts past dates like any other date', () => {
+    expect(pickerValueToExpiryMs('2020-01-15')).toBe(Date.UTC(2020, 0, 15))
+    expect(expiryMsToPickerValue(Date.UTC(2020, 0, 15))).toBe('2020-01-15')
+  })
+
+  it('maps empty and invalid input to empty/null', () => {
+    expect(expiryMsToPickerValue(null)).toBe('')
+    expect(pickerValueToExpiryMs('')).toBeNull()
+    expect(pickerValueToExpiryMs('2027/03/05')).toBeNull()
+    expect(pickerValueToExpiryMs('2027-02-30')).toBeNull()
+    expect(pickerValueToExpiryMs('2027-13-01')).toBeNull()
+    expect(pickerValueToExpiryMs('tomorrow')).toBeNull()
   })
 })

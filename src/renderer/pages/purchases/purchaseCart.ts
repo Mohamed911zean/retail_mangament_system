@@ -67,3 +67,35 @@ export function parseExpiryDate(text: string): number | null {
   if (built.getUTCFullYear() !== year || built.getUTCMonth() !== month - 1 || built.getUTCDate() !== day) return null
   return built.getTime()
 }
+
+/**
+ * Expiry conversion for the native date picker (`yyyy-mm-dd`). Stored values
+ * are UTC midnights (see `parseExpiryDate`), so both directions use UTC field
+ * accessors: local getters would shift the day on timezones ahead of UTC and
+ * silently store the wrong date. Past dates convert like any other — whether
+ * they are accepted is the service's decision, not the picker's.
+ */
+
+/** Stored ms (or null) → picker value. */
+export function expiryMsToPickerValue(expiryAtMs: number | null): string {
+  if (expiryAtMs === null) return ''
+  if (!Number.isSafeInteger(expiryAtMs)) return ''
+  const date = new Date(expiryAtMs)
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/** Picker value → stored ms, or null for empty/invalid input. */
+export function pickerValueToExpiryMs(text: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(text.trim())
+  if (match === null) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  const built = new Date(Date.UTC(year, month - 1, day))
+  if (built.getUTCFullYear() !== year || built.getUTCMonth() !== month - 1 || built.getUTCDate() !== day) return null
+  return built.getTime()
+}
