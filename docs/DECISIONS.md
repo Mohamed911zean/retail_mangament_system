@@ -827,3 +827,19 @@ transaction after every stock movement.
   stored row is touched. A cashier who attempts to sell past a limit still gets
   `credit_limit_exceeded`; they simply cannot lift it.
 
+## Decision #14 - Voids require `document.void`; counter returns stay open
+
+**Date:** 2026-10-12
+**Status:** Accepted; bug fix, no migration.
+
+- **The gap.** `VoidService` never checked the actor, so a cashier could void
+  any sale, purchase, return or expense through IPC. The frozen schema lists
+  `document.void` as a figure-guarding permission and the payment reversals
+  already assert it — the void methods were the odd ones out.
+- **The fix.** All four void methods assert `document.void` before any write;
+  a cashier gets `permission_denied` with the document untouched.
+- **Returns are different.** `SaleReturnService.processReturn` stays open to
+  cashiers on purpose: accepting a return at the counter is ordinary cashier
+  work (the existing void tests process returns as cashier), and no permission
+  code covers it. Voiding that return afterwards still needs `document.void`.
+
