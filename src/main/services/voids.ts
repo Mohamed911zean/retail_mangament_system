@@ -19,6 +19,7 @@ import { noFaults } from './fault-injector'
 import type { IdGenerator } from './ids'
 import { createUlidGenerator } from './ids'
 import type { Actor } from './permissions'
+import { assertPermission } from './permissions'
 import { serviceErr, serviceOk, type ServiceResult, ServiceTransactionError } from './result'
 import { writeAudit } from './audit'
 
@@ -85,6 +86,8 @@ export class VoidService {
   }
 
   async voidSale(actor: Actor, input: VoidInput): Promise<ServiceResult<{ id: string }>> {
+    const permission = assertPermission(actor, 'document.void')
+    if (!permission.ok) return permission
     try {
       const sale = getSale(this.deps.database, input.documentId)
       if (sale === undefined) return serviceErr('not_found', { field: 'documentId' })
@@ -180,6 +183,8 @@ export class VoidService {
   }
 
   async voidPurchase(actor: Actor, input: VoidInput): Promise<ServiceResult<{ id: string }>> {
+    const permission = assertPermission(actor, 'document.void')
+    if (!permission.ok) return permission
     try {
       const purchase = getPurchase(this.deps.database, input.documentId)
       if (purchase === undefined) return serviceErr('not_found', { field: 'documentId' })
@@ -273,6 +278,8 @@ export class VoidService {
   }
 
   async voidSaleReturn(actor: Actor, input: VoidInput): Promise<ServiceResult<{ id: string }>> {
+    const permission = assertPermission(actor, 'document.void')
+    if (!permission.ok) return permission
     try {
       const saleReturn = getSaleReturn(this.deps.database, input.documentId)
       if (saleReturn === undefined) return serviceErr('not_found', { field: 'documentId' })
@@ -365,6 +372,8 @@ export class VoidService {
   }
 
   async voidExpense(actor: Actor, input: VoidInput): Promise<ServiceResult<{ id: string }>> {
+    const permission = assertPermission(actor, 'document.void')
+    if (!permission.ok) return permission
     try {
       const expense = getExpense(this.deps.database, input.documentId)
       if (expense === undefined) return serviceErr('not_found', { field: 'documentId' })

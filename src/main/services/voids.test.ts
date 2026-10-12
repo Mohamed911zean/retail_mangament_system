@@ -6,6 +6,7 @@ import { closeDatabase, openDatabase } from '../database/database'
 import { SaleService } from './sales'
 import { PurchaseService } from './purchases'
 import { SaleReturnService } from './saleReturns'
+import { ShiftService } from './shifts'
 import { VoidService } from './voids'
 import { verifyDatabase } from '../database/db-verify'
 import type { Clock } from './clock'
@@ -56,6 +57,7 @@ function makeServices(database: TestDb, ids: IdGenerator, allowNegativeStock = f
     sales: new SaleService(deps),
     purchases: new PurchaseService(deps),
     returns: new SaleReturnService(deps),
+    shifts: new ShiftService(deps),
     voids: new VoidService(deps),
   }
 }
@@ -66,6 +68,68 @@ function onHand(database: TestDb, productId: string): number {
 }
 
 describe('VoidService', () => {
+  it('refuses all four void methods for a cashier without touching the documents', async () => {
+    const root = join(tmpdir(), `small-shop-pos-void-permission-${Date.now()}`)
+    mkdirSync(root, { recursive: true })
+    const context = await openDatabase(join(root, 'user-data'), join(process.cwd(), 'migrations'))
+    setupVoidDb(context.database)
+    const services = makeServices(context.database, testIds())
+
+    const saleResult = await services.sales.completeSale(cashierActor, {
+      shiftId: 'sh1',
+      lines: [{ productId: 'p1', unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 2, unitPricePiasters: 150 }],
+      tenders: [{ method: 'cash', amountPiasters: 300 }],
+      taxEnabled: false,
+      cashRoundingStep: 0,
+    })
+    if (!saleResult.ok) throw new Error('sale failed')
+
+    const purchaseResult = await services.purchases.receivePurchase(managerActor, {
+      supplierId: 's1',
+      lines: [{ productId: 'p1', unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 5, unitCostPiasters: 100 }],
+      tenders: [],
+      taxEnabled: false,
+    })
+    if (!purchaseResult.ok) throw new Error('purchase failed')
+
+    const saleItems = context.database.prepare('SELECT id FROM sale_items WHERE sale_id = ?').all(saleResult.value.sale.id) as { id: string }[]
+    const returnResult = await services.returns.processReturn(cashierActor, {
+      originalSaleId: saleResult.value.sale.id,
+      lines: [{ saleItemId: saleItems[0].id, qtyBase: 1, condition: 'damaged' }],
+    })
+    if (!returnResult.ok) throw new Error('return failed')
+
+    const expenseResult = await services.shifts.recordExpense(managerActor, {
+      shiftId: 'sh1',
+      category: 'نظافة',
+      description: 'منظفات',
+      amountPiasters: 100,
+      paymentMethod: 'cash',
+    })
+    if (!expenseResult.ok) throw new Error('expense failed')
+
+    const attempts = [
+      services.voids.voidSale(cashierActor, { documentId: saleResult.value.sale.id, reason: 'x' }),
+      services.voids.voidPurchase(cashierActor, { documentId: purchaseResult.value.purchase.id, reason: 'x' }),
+      services.voids.voidSaleReturn(cashierActor, { documentId: returnResult.value.saleReturn.id, reason: 'x' }),
+      services.voids.voidExpense(cashierActor, { documentId: expenseResult.value.id, reason: 'x' }),
+    ]
+    for (const attempt of attempts) {
+      const result = await attempt
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.error.code).toBe('permission_denied')
+    }
+
+    // Nothing was written: every document is still completed/posted.
+    const statuses = context.database.prepare(
+      "SELECT 'sale' AS kind, status FROM sales WHERE id = ? UNION ALL SELECT 'purchase', status FROM purchases WHERE id = ? UNION ALL SELECT 'return', status FROM sale_returns WHERE id = ? UNION ALL SELECT 'expense', status FROM expenses WHERE id = ?",
+    ).all(saleResult.value.sale.id, purchaseResult.value.purchase.id, returnResult.value.saleReturn.id, expenseResult.value.id) as { kind: string; status: string }[]
+    expect(statuses.map((row) => row.status).sort()).toEqual(['completed', 'completed', 'completed', 'posted'])
+    expect(verifyDatabase(context.database).ok).toBe(true)
+    closeDatabase(context)
+    rmSync(root, { recursive: true, force: true })
+  })
+
   it('voidSale: completes a sale then voids it — status, stock, and money are reversed', async () => {
     const root = join(tmpdir(), `small-shop-pos-void-sale-${Date.now()}`)
     mkdirSync(root, { recursive: true })
