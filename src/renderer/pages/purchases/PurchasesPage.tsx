@@ -74,6 +74,7 @@ export function PurchasesPage({ user, preferences, initialTab }: PurchasesPagePr
   const [supplierDetailsError, setSupplierDetailsError] = useState<string | null>(null)
   const [deleteSupplier, setDeleteSupplier] = useState<SupplierRow | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [userNames, setUserNames] = useState<Map<string, string>>(new Map())
   const [saving, setSaving] = useState(false)
 
   const canManage = user.role !== 'cashier'
@@ -97,12 +98,14 @@ export function PurchasesPage({ user, preferences, initialTab }: PurchasesPagePr
     setFailed(false)
     void (async () => {
       try {
-        const [info, listedSuppliers, listedProducts] = await Promise.all([
+        const [info, listedSuppliers, listedProducts, listedUsers] = await Promise.all([
           unwrap(window.api.app.getInfo()),
           unwrap(window.api.suppliers.list()),
           unwrap(window.api.catalog.listProducts()),
+          unwrap(window.api.users.list()),
         ])
         if (!alive) return
+        setUserNames(new Map(listedUsers.map((entry) => [entry.id, entry.displayName])))
         setPaymentMethods(info.settings.payment_methods)
         setTaxEnabled(info.settings.tax)
         setExpiryEnabled(info.settings.expiry_batches)
@@ -566,6 +569,7 @@ export function PurchasesPage({ user, preferences, initialTab }: PurchasesPagePr
         details={details}
         products={products ?? []}
         supplierName={details?.purchase.supplierId === null || details?.purchase.supplierId === undefined ? null : (supplierNames.get(details.purchase.supplierId) ?? null)}
+        voidedByName={details?.purchase.voidedByUserId == null ? null : (userNames.get(details.purchase.voidedByUserId) ?? null)}
         digitStyle={digitStyle}
         canVoid={canManage}
         saving={saving}

@@ -249,6 +249,22 @@ Setup: log in as owner. The Settings page is hidden for cashiers.
 - RTL layout of the users table and dialogs at 1280×720 and 1366×768.
 - Real restore round-trip on the shop PC.
 
+## Item 1 — Purchase expiry date picker
+
+- [ ] In "فاتورة شراء جديدة", the expiry field is a calendar picker (no typed
+      format). Picking a date saves the line; the stored `expiryAt` equals the
+      picked day (check via the expiry list in المخزون).
+- [ ] Clearing the picker saves the line with no expiry.
+- [ ] A half-typed/unparseable picker value blocks adding the line with
+      "تاريخ غير صالح" instead of storing a wrong date.
+
+## Item 2 — Void metadata on canceled purchase invoices
+
+- [ ] Open التفاصيل on a canceled (ملغاة) invoice: a section shows the cancel
+      reason, who canceled it (display name), and when.
+- [ ] Completed invoices show no such section.
+- [ ] Unknown/deleted voiding user shows "—" instead of a blank.
+
 
 ## ----- SOME NOTICIES : 
 

@@ -19,6 +19,8 @@ export type PurchaseDetailsDialogProps = {
   products: readonly ProductSummary[]
   /** Null means "no supplier on this invoice". */
   supplierName: string | null
+  /** Display name of the voiding user, or null when unknown. */
+  voidedByName: string | null
   digitStyle: DigitStyle
   /** Owner/manager only — the service refuses a cashier regardless. */
   canVoid: boolean
@@ -34,6 +36,7 @@ export function PurchaseDetailsDialog({
   details,
   products,
   supplierName,
+  voidedByName,
   digitStyle,
   canVoid,
   saving,
@@ -176,6 +179,24 @@ export function PurchaseDetailsDialog({
                   </Button>
                 </div>
               )}
+            </section>
+          )}
+          {details.purchase.status === 'voided' && (
+            <section aria-label={messages.purchases.statusVoided} className="flex flex-col gap-2 rounded-lg border border-line bg-panel px-4 py-3">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-secondary">{messages.purchases.voidReason}</span>
+                <span className="text-base font-semibold text-ink">{details.purchase.voidReason ?? messages.common.emptyValue}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-secondary">{messages.purchases.voidedBy}</span>
+                <span className="text-base text-ink">{voidedByName ?? messages.common.emptyValue}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-secondary">{messages.purchases.voidedAt}</span>
+                <span className="numeric text-base text-ink">
+                  {details.purchase.voidedAt === null ? messages.common.emptyValue : formatDateTime(details.purchase.voidedAt, digitStyle)}
+                </span>
+              </div>
             </section>
           )}
         </div>
