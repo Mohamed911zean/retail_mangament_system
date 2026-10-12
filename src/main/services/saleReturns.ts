@@ -1,7 +1,7 @@
 import type { DatabaseHandle } from '../database/repositories/common'
 import { runInTransaction } from '../database/repositories/common'
 import { getSale, listSaleItems } from '../database/repositories/sales'
-import { getSaleReturn, insertSaleReturn, insertSaleReturnItem, listSaleReturnItems, listSaleReturnsBySale } from '../database/repositories/sale-returns'
+import { getSaleReturn, insertSaleReturn, insertSaleReturnItem, listSaleReturnItems, listSaleReturns, listSaleReturnsBySale } from '../database/repositories/sale-returns'
 import { insertMoneyLedgerEntry } from '../database/repositories/money-ledger'
 import { nextSequenceNumber } from '../database/repositories/sequences'
 import type { SaleReturnRow, SaleReturnItemRow } from '../database/rows'
@@ -224,5 +224,9 @@ export class SaleReturnService {
       const items = listSaleReturnItems(this.deps.database, id)
       return serviceOk({ saleReturn, items })
     } catch (e) { return serviceErr('database_error', e) }
+  }
+
+  async listSaleReturns(): Promise<ServiceResult<SaleReturnRow[]>> {
+    try { return serviceOk(listSaleReturns(this.deps.database)) } catch (e) { return serviceErr('database_error', e) }
   }
 }

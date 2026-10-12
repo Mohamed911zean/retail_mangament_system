@@ -13,6 +13,7 @@ import type {
   ProductInput,
   ReceivePurchaseInput,
   ReportRangeInput,
+  CreateReturnInput,
   ReverseEntryInput,
   SupplierInput,
   SupplierPaymentInput,
@@ -147,6 +148,12 @@ const api: IpcApi = {
     sales: (input: ReportRangeInput) => invoke('reports:sales', input),
     profit: (input: ReportRangeInput) => invoke('reports:profit', input),
     stockValue: () => invoke('reports:stock-value'),
+  },
+
+  returns: {
+    list: () => invoke('returns:list'),
+    get: (returnId: string) => invoke('returns:get', { returnId }),
+    create: (input: CreateReturnInput) => invoke('returns:create', input),
   },
 
   settings: {

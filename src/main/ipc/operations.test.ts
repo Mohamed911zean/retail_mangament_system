@@ -845,3 +845,97 @@ describe('runOperation — reports over IPC', () => {
     expect(backwards.code).toBe('invalid_input')
   })
 })
+
+describe('runOperation — returns over IPC', () => {
+  it('creates a return from an invoice, lists it, reads it back and voids it', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const product = expectSuccess(
+      await runOperation(
+        'catalog:create-product',
+        { name: 'جبنة رومي', baseUnitName: 'piece', qtyScale: 0, costPricePiasters: 1000, sellingPricePiasters: 1500 },
+        context,
+      ),
+    ) as { id: string }
+
+    // Stock first: 10 units @ 1000 on credit (no shift needed without tenders).
+    const supplier = expectSuccess(await runOperation('suppliers:create', { name: 'مورد' }, context)) as { id: string }
+    expectSuccess(
+      await runOperation(
+        'purchases:receive',
+        {
+          supplierId: supplier.id,
+          lines: [{ productId: product.id, unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 10, unitCostPiasters: 1000 }],
+          tenders: [],
+          taxEnabled: false,
+        },
+        context,
+      ),
+    )
+
+    const shift = expectSuccess(await runOperation('shifts:open', { openingCashPiasters: 0 }, context)) as { id: string }
+
+    // 4 units @ 1500 = 6000 cash.
+    const sale = expectSuccess(
+      await runOperation(
+        'sales:complete',
+        {
+          lines: [{ productId: product.id, unitNameSnapshot: 'piece', pricedUnitQtyBase: 1, qtyBase: 4, unitPricePiasters: 1500 }],
+          tenders: [{ method: 'cash', amountPiasters: 6000 }],
+          taxEnabled: false,
+          cashRoundingStep: 0,
+        },
+        context,
+      ),
+    ) as { sale: { id: string }; items: { id: string }[] }
+
+    // Return 1 of 4 units resalable: refund 1500, all of it cash.
+    const created = expectSuccess(
+      await runOperation(
+        'returns:create',
+        {
+          originalSaleId: sale.sale.id,
+          shiftId: shift.id,
+          lines: [{ saleItemId: sale.items[0].id, qtyBase: 1, condition: 'resalable' }],
+          cashRefundPiasters: 1500,
+          reason: 'تالف جزئي',
+        },
+        context,
+      ),
+    ) as {
+      saleReturn: { id: string; totalPiasters: number; cashRefundedPiasters: number; creditedToAccountPiasters: number; status: string }
+      items: { qtyBase: number; condition: string }[]
+    }
+    expect(created.saleReturn.totalPiasters).toBe(1500)
+    expect(created.saleReturn.cashRefundedPiasters).toBe(1500)
+    expect(created.saleReturn.creditedToAccountPiasters).toBe(0)
+    expect(created.items).toHaveLength(1)
+    expect(created.items[0].condition).toBe('resalable')
+
+    // Returning the same 4 units again exceeds the original line.
+    const overReturn = expectFailure(
+      await runOperation(
+        'returns:create',
+        { originalSaleId: sale.sale.id, lines: [{ saleItemId: sale.items[0].id, qtyBase: 4, condition: 'damaged' }] },
+        context,
+      ),
+    )
+    expect(overReturn.code).toBe('return_exceeds_original')
+
+    const listed = expectSuccess(await runOperation('returns:list', {}, context)) as { id: string }[]
+    expect(listed.map((row) => row.id)).toContain(created.saleReturn.id)
+
+    const readBack = expectSuccess(await runOperation('returns:get', { returnId: created.saleReturn.id }, context)) as {
+      saleReturn: { id: string }
+      items: { qtyBase: number }[]
+    }
+    expect(readBack.items[0].qtyBase).toBe(1)
+
+    expectSuccess(await runOperation('voids:void-sale-return', { documentId: created.saleReturn.id, reason: 'خطأ' }, context))
+    const afterVoid = expectSuccess(await runOperation('returns:get', { returnId: created.saleReturn.id }, context)) as {
+      saleReturn: { status: string }
+    }
+    expect(afterVoid.saleReturn.status).toBe('voided')
+  })
+})

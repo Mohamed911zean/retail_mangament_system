@@ -23,6 +23,8 @@ import type {
   PurchaseItemRow,
   PurchaseRow,
   SaleItemRow,
+  SaleReturnItemRow,
+  SaleReturnRow,
   SaleRow,
   ShiftRow,
   StockBatchRow,
@@ -242,6 +244,24 @@ export type CashMoveInput = { shiftId: string; amountPiasters: number; reference
 
 export type ReportRangeInput = { fromMs: number; toMs: number }
 
+export type ReturnLine = {
+  saleItemId: string
+  qtyBase: number
+  condition: 'resalable' | 'damaged'
+}
+
+export type CreateReturnInput = {
+  originalSaleId: string
+  /** Current open shift, or null when shifts are off/closed. */
+  shiftId?: string | null
+  lines: ReturnLine[]
+  /** Cash handed back now; the rest becomes account credit. Defaults to all. */
+  cashRefundPiasters?: number
+  reason?: string | null
+}
+
+export type ReturnDetails = { saleReturn: SaleReturnRow; items: SaleReturnItemRow[] }
+
 export type ProfitReport = {
   revenuePiasters: number
   discountPiasters: number
@@ -348,6 +368,10 @@ export const IPC_CHANNELS = [
   'reports:sales',
   'reports:profit',
   'reports:stock-value',
+
+  'returns:list',
+  'returns:get',
+  'returns:create',
 
   'settings:get',
   'settings:set',
@@ -475,6 +499,11 @@ export type IpcApi = {
     /** Total on-hand value plus the ids that need review. */
     stockValue: () => Promise<IpcResult<StockValueReport>>
   }
+  returns: {
+    list: () => Promise<IpcResult<SaleReturnRow[]>>
+    get: (returnId: string) => Promise<IpcResult<ReturnDetails>>
+    create: (input: CreateReturnInput) => Promise<IpcResult<ReturnDetails>>
+  }
   settings: {
     get: () => Promise<IpcResult<Settings>>
     set: (key: SettingsKey, value: Settings[SettingsKey]) => Promise<IpcResult<Settings>>
@@ -501,4 +530,4 @@ export type IpcApi = {
   }
 }
 
-export type { Settings, PaymentMethod, MoneyLedgerRow, PurchaseRow, PurchaseItemRow, SupplierRow, StockBatchRow, StockCountRow, StockCountItemRow, ExpenseRow }
+export type { Settings, PaymentMethod, MoneyLedgerRow, PurchaseRow, PurchaseItemRow, SupplierRow, StockBatchRow, StockCountRow, StockCountItemRow, ExpenseRow, SaleReturnRow, SaleReturnItemRow }

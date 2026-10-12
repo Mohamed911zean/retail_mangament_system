@@ -897,6 +897,48 @@ export const operations: Record<IpcChannel, OperationSpec> = {
     handle: async (context) => context.services.reports.getStockValueReport(),
   },
 
+  // ── Returns ───────────────────────────────────────────────────────────────
+  'returns:list': {
+    auth: true,
+    mutating: false,
+    handle: async (context) => context.services.returns.listSaleReturns(),
+  },
+  'returns:get': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.returns.getSaleReturn(v.id(input.returnId, 'returnId'))
+    },
+  },
+  'returns:create': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      return context.services.returns.processReturn(requireActor(context), {
+        originalSaleId: v.id(input.originalSaleId, 'originalSaleId'),
+        shiftId: v.optionalId(input.shiftId, 'shiftId') ?? null,
+        lines: v.array(
+          input.lines,
+          'lines',
+          (item, index) => {
+            const line = v.payload(item)
+            const at = (field: string): string => `returnLines[${index}].${field}`
+            return {
+              saleItemId: v.id(line.saleItemId, at('saleItemId')),
+              qtyBase: v.integer(line.qtyBase, at('qtyBase'), { min: 1 }),
+              condition: v.oneOf(line.condition, at('condition'), ['resalable', 'damaged'] as const),
+            }
+          },
+          { min: 1, max: 200 },
+        ),
+        cashRefundPiasters: input.cashRefundPiasters === undefined ? undefined : v.money(input.cashRefundPiasters, 'cashRefundPiasters'),
+        reason: v.optionalText(input.reason, 'reason', { max: 300 }) ?? null,
+      })
+    },
+  },
+
   // ── Settings ──────────────────────────────────────────────────────────────
   'settings:get': {
     auth: false,

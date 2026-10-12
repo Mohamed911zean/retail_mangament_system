@@ -5,6 +5,7 @@ import { InventoryService } from '../services/inventory'
 import { PaymentService } from '../services/payments'
 import { PurchaseService, SupplierService } from '../services/purchases'
 import { ReportService } from '../services/reports'
+import { SaleReturnService } from '../services/saleReturns'
 import { SaleService } from '../services/sales'
 import { SettingsService, resolveSettingsSync } from '../services/settings'
 import { ShiftService } from '../services/shifts'
@@ -29,6 +30,7 @@ export type Services = {
   suppliers: SupplierService
   voids: VoidService
   reports: ReportService
+  returns: SaleReturnService
 }
 
 export type ServiceFactoryDeps = {
@@ -71,5 +73,6 @@ export function createServices(database: DatabaseHandle, deps: ServiceFactoryDep
     suppliers: new SupplierService(common),
     voids: new VoidService({ ...common, allowNegativeStock: settings.allow_negative_stock, shiftsEnabled: settings.shifts }),
     reports: new ReportService({ database }),
+    returns: new SaleReturnService({ ...common, allowNegativeStock: settings.allow_negative_stock }),
   }
 }
