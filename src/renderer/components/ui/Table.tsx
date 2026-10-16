@@ -64,7 +64,6 @@ export function TRow({
 
 export function TH({
   children,
-  numeric = false,
   end = false,
   className,
 }: {
@@ -75,7 +74,18 @@ export function TH({
   className?: string
 }) {
   return (
-    <th scope="col" className={cn('border-b border-line px-3 py-2 font-semibold text-strong', end ? 'text-end' : 'text-start', 'text-dense', numeric && 'numeric', className)}>
+    <th
+      scope="col"
+      className={cn(
+        'border-b border-line px-3 py-2 font-semibold text-strong text-dense whitespace-nowrap',
+        // Numeric headers must NOT get the `numeric` class: it flips direction
+        // to ltr, which makes `text-start` mean "left" and misaligns the header
+        // with its (end-aligned) cells. In the table's own RTL context,
+        // `text-start` = right = the same edge the numeric cells align to.
+        end ? 'text-end' : 'text-start',
+        className,
+      )}
+    >
       {children}
     </th>
   )
