@@ -843,3 +843,45 @@ transaction after every stock movement.
   work (the existing void tests process returns as cashier), and no permission
   code covers it. Voiding that return afterwards still needs `document.void`.
 
+## Decision #15 — Supermarket pack: import/export permission codes
+
+**Date:** 2026-10-16
+**Status:** Accepted; additive only.
+
+- Two new permission codes are added to `src/shared/permissions.ts`:
+  `data.import` (owner, manager) and `data.export` (owner, manager; cashier none).
+- These guard bulk data writes and data visibility respectively.
+- Price/cost columns in an import additionally require the existing
+  `product.price_change` / `product.cost_change` codes; columns without
+  permission are silently ignored with a visible Arabic warning.
+- Every import writes one audit row (entity, file name, counts, mode;
+  never file content).
+- No migration required: permission codes live in code, not tables.
+
+## Decision #16 — Supermarket pack: products.scale_plu column (migration 0010)
+
+**Date:** 2026-10-16
+**Status:** Accepted; additive nullable column.
+
+- Migration `0010_supermarket_d_scale_plu.sql` adds `products.scale_plu TEXT NULL`
+  with a partial unique index (`WHERE scale_plu IS NOT NULL`).
+- This is the only schema change required for features A-G.
+- The column is exposed in `ProductRow` and in the product CRUD IPC surface.
+- No new `db:verify` code; scale_plu values are validated at write time.
+
+## Decision #17 — Supermarket pack: label printing and internal barcode sequence
+
+**Date:** 2026-10-16
+**Status:** Accepted.
+
+- Labels rendered as HTML/SVG in a hidden BrowserWindow, printed via Windows
+  driver silently (same Phase 0 architecture). No raw TSPL/ZPL in v1.
+- Barcode symbology: EAN-13 for valid 13-digit codes; Code 128 otherwise.
+  Both encoded locally as SVG (no network library).
+- Internal barcode prefix: `29` by default (configurable; must not overlap
+  scale prefix — validated together on change).
+- Internal barcode sequence: new row `sequence_name = 'internal_barcode'`
+  in `device_sequences`, seeded by migration
+  `0011_supermarket_f_internal_barcode_seq.sql`. No new table.
+- Generated barcodes saved to `barcodes` table as normal barcodes (audited).
+
