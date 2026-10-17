@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Button,
@@ -14,6 +14,7 @@ import {
 import { TrashIcon } from '../../components/icons'
 import { messages } from '../../i18n'
 import { formatMoney, formatQty, type DigitStyle } from '../../lib/format'
+import { validateCheckDigit } from '../../../domain/barcodeValidation'
 import type { CategoryRow, ProductUnitRow } from '../../../shared/rows'
 import type { ProductInput, ProductSummary, ProductUpdateInput } from '../../../shared/ipc'
 
@@ -26,13 +27,14 @@ import type { ProductInput, ProductSummary, ProductUpdateInput } from '../../../
  * since they need its id — a just-created product stays open in edit mode.
  */
 export type SavePayload =
-  | { mode: 'create'; input: ProductInput }
+  | { mode: 'create'; input: ProductInput; initialBarcode?: string }
   | { mode: 'edit'; id: string; fields: ProductUpdateInput }
 
 export type ProductDialogProps = {
   open: boolean
   /** Null means "create"; a summary means "edit this product". */
   product: ProductSummary | null
+  initialBarcode?: string | null
   categories: readonly CategoryRow[]
   /** `features.weighted_items`: without it every product is counted pieces. */
   weightedEnabled: boolean
@@ -57,6 +59,7 @@ export type ProductDialogProps = {
 export function ProductDialog({
   open,
   product,
+  initialBarcode,
   categories,
   weightedEnabled,
   expiryEnabled,
@@ -91,6 +94,7 @@ export function ProductDialog({
   const [barcode, setBarcode] = useState('')
   const [barcodePrimary, setBarcodePrimary] = useState(false)
   const [confirmBarcode, setConfirmBarcode] = useState<string | null>(null)
+  const barcodeInputRef = useRef<HTMLInputElement>(null)
 
   // Opening (or switching to another product) reseeds the draft; typing never
   // does. Unit/barcode drafts live outside this effect so a refreshed product
@@ -111,6 +115,8 @@ export function ProductDialog({
       setCostPrice(0)
       setThreshold(0)
       setTrackExpiry(false)
+      setBarcode(initialBarcode ?? '')
+      setBarcodePrimary(true)
       return
     }
     setName(product.name)
@@ -122,7 +128,7 @@ export function ProductDialog({
     setCostPrice(product.costPricePiasters)
     setThreshold(product.lowStockThresholdQty)
     setTrackExpiry(product.trackExpiry)
-  }, [open, product])
+  }, [open, product, initialBarcode])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const qtyScale = kind === 'weighted' ? 3 : 0
@@ -147,7 +153,7 @@ export function ProductDialog({
       lowStockThresholdQty: threshold,
     }
     if (product === null) {
-      onSave({ mode: 'create', input: base })
+      onSave({ mode: 'create', input: base, initialBarcode: barcode.trim() || undefined })
       return
     }
     // Send only what changed: re-sending an identical packaging value must not
@@ -225,6 +231,30 @@ export function ProductDialog({
             />
           </Field>
         </div>
+
+        {product === null && (
+          <Field
+            label={messages.products.barcodes}
+            htmlFor="create-product-barcode"
+            helper={
+              barcode.trim().length > 0
+                ? validateCheckDigit(barcode.trim()) === 'invalid_check'
+                  ? messages.products.barcodeInvalidCheck
+                  : validateCheckDigit(barcode.trim()) === 'valid'
+                    ? messages.products.barcodeStandardValid
+                    : undefined
+                : undefined
+            }
+          >
+            <SearchInput
+              id="create-product-barcode"
+              value={barcode}
+              onChange={(event) => setBarcode(event.target.value)}
+              onClear={() => setBarcode('')}
+              placeholder={messages.products.barcodePlaceholder}
+            />
+          </Field>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <Field label={messages.products.baseUnit} htmlFor="product-base-unit">
@@ -323,6 +353,7 @@ export function ProductDialog({
               barcodePrimary={barcodePrimary}
               barcodeValid={barcodeValid}
               confirmBarcode={confirmBarcode}
+              barcodeInputRef={barcodeInputRef}
               onBarcode={setBarcode}
               onBarcodePrimary={setBarcodePrimary}
               onConfirmBarcode={setConfirmBarcode}
@@ -331,6 +362,7 @@ export function ProductDialog({
                 onAddBarcode(product.id, barcode.trim(), barcodePrimary)
                 setBarcode('')
                 setBarcodePrimary(false)
+                setTimeout(() => barcodeInputRef.current?.focus(), 50)
               }}
               onRemoveBarcode={(code) => {
                 setConfirmBarcode(null)
@@ -451,6 +483,7 @@ function BarcodesSection({
   barcodePrimary,
   barcodeValid,
   confirmBarcode,
+  barcodeInputRef,
   onBarcode,
   onBarcodePrimary,
   onConfirmBarcode,
@@ -462,12 +495,21 @@ function BarcodesSection({
   barcodePrimary: boolean
   barcodeValid: boolean
   confirmBarcode: string | null
+  barcodeInputRef: React.RefObject<HTMLInputElement | null>
   onBarcode: (value: string) => void
   onBarcodePrimary: (value: boolean) => void
   onConfirmBarcode: (barcode: string | null) => void
   onAddBarcode: () => void
   onRemoveBarcode: (barcode: string) => void
 }) {
+  const checkStatus = barcode.trim().length > 0 ? validateCheckDigit(barcode.trim()) : null
+  const helperText =
+    checkStatus === 'invalid_check'
+      ? messages.products.barcodeInvalidCheck
+      : checkStatus === 'valid'
+        ? messages.products.barcodeStandardValid
+        : messages.products.addBarcodeEnterHint
+
   return (
     <section aria-label={messages.products.barcodes} className="flex flex-col gap-3 rounded-lg border border-line p-4">
       <h3 className="text-h3 font-semibold text-ink">{messages.products.barcodes}</h3>
@@ -503,11 +545,20 @@ function BarcodesSection({
 
       <div className="flex items-end gap-2">
         <div className="flex-1">
-          <Field label={messages.products.barcodePlaceholder} htmlFor="product-barcode">
+          <Field label={messages.products.barcodePlaceholder} htmlFor="product-barcode" helper={helperText}>
             <SearchInput
+              ref={barcodeInputRef}
               id="product-barcode"
               value={barcode}
               onChange={(event) => onBarcode(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  if (barcodeValid) {
+                    onAddBarcode()
+                  }
+                }
+              }}
               onClear={() => onBarcode('')}
               placeholder={messages.products.barcodePlaceholder}
             />

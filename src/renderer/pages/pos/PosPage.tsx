@@ -22,7 +22,9 @@ import { formatDateTime, type DigitStyle } from '../../lib/format'
 import type { Preferences } from '../../lib/preferences'
 import type { Settings } from '../../../shared/settings'
 import type { CloseShiftResult, CurrentUser, CustomerSummary, ProductSummary, SaleTender } from '../../../shared/ipc'
-import type { ShiftRow } from '../../../shared/rows'
+import { useToast } from '../../lib/toast'
+import { ProductDialog } from '../products/ProductDialog'
+import type { CategoryRow, ShiftRow } from '../../../shared/rows'
 import {
   addProduct,
   cartFromSaleLines,
@@ -60,6 +62,8 @@ type Banner = { kind: 'success' | 'info' | 'warning' | 'error'; text: string }
 type DiscountTarget = { kind: 'invoice' } | { kind: 'line'; lineId: string }
 
 export function PosPage({ user, preferences }: PosPageProps) {
+  const toast = useToast()
+  const canManage = user.role === 'owner' || user.role === 'manager'
   const digitStyle: DigitStyle = preferences.digitStyle
 
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -92,6 +96,12 @@ export function PosPage({ user, preferences }: PosPageProps) {
   const [banner, setBanner] = useState<Banner | null>(null)
   const [lastSaleId, setLastSaleId] = useState<string | null>(null)
   const [heldToken, setHeldToken] = useState(0)
+
+  const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null)
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false)
+  const [quickCreateCategories, setQuickCreateCategories] = useState<readonly CategoryRow[]>([])
+  const [quickCreateSaving, setQuickCreateSaving] = useState(false)
+  const [quickCreateError, setQuickCreateError] = useState<string | null>(null)
 
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -177,7 +187,20 @@ export function PosPage({ user, preferences }: PosPageProps) {
   function handleScanSubmit(code: string): boolean {
     if (products === null) return false
     const match = findExactBarcode(products, code)
-    if (match === undefined) return false
+    if (match === undefined) {
+      if (canManage) {
+        setUnknownBarcode(code)
+        toast({ message: messages.pos.unknownBarcodePrompt, kind: 'info' })
+        setBanner({ kind: 'warning', text: `${messages.pos.unknownBarcodePrompt} (${code})` })
+        void window.api.catalog.listCategories().then((res) => {
+          if (res.ok) setQuickCreateCategories(res.value)
+        })
+        setQuickCreateOpen(true)
+      } else {
+        setBanner({ kind: 'error', text: `${messages.pos.unknownBarcodeNotFound}: ${code}` })
+      }
+      return false
+    }
     handleAdd(match)
     return true
   }
@@ -720,6 +743,61 @@ export function PosPage({ user, preferences }: PosPageProps) {
           </>
         }
       />
+
+      {quickCreateOpen && (
+        <ProductDialog
+          open={quickCreateOpen}
+          product={null}
+          initialBarcode={unknownBarcode}
+          categories={quickCreateCategories}
+          weightedEnabled={settings?.weighted_items ?? false}
+          expiryEnabled={settings?.expiry_batches ?? false}
+          canEditPrice={canManage}
+          canEditCost={canManage}
+          digitStyle={digitStyle}
+          saving={quickCreateSaving}
+          errorText={quickCreateError}
+          onClose={() => {
+            setQuickCreateOpen(false)
+            setUnknownBarcode(null)
+            searchRef.current?.focus()
+          }}
+          onSave={async (payload) => {
+            if (payload.mode === 'create') {
+              setQuickCreateSaving(true)
+              setQuickCreateError(null)
+              try {
+                const created = await unwrap(window.api.catalog.createProduct(payload.input))
+                if (payload.initialBarcode) {
+                  try {
+                    await unwrap(window.api.catalog.addBarcode(created.id, payload.initialBarcode, true))
+                  } catch (e) {
+                    console.error('Failed to attach barcode', e)
+                  }
+                }
+                await loadProducts()
+                setQuickCreateOpen(false)
+                setUnknownBarcode(null)
+                toast({ message: messages.products.created, kind: 'success' })
+                try {
+                  const summary = await unwrap(window.api.catalog.getProduct(created.id))
+                  handleAdd(summary)
+                } catch {
+                  handleAdd(created)
+                }
+              } catch (err) {
+                setQuickCreateError(translate(errorKey(err)))
+              } finally {
+                setQuickCreateSaving(false)
+              }
+            }
+          }}
+          onAddUnit={() => {}}
+          onRemoveUnit={() => {}}
+          onAddBarcode={() => {}}
+          onRemoveBarcode={() => {}}
+        />
+      )}
     </div>
   )
 }

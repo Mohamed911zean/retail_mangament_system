@@ -12,6 +12,8 @@ import { SessionStore } from './session'
 import { systemClock, type Clock } from '../services/clock'
 import type { IdGenerator } from '../services/ids'
 
+import { BarcodeIndex, globalBarcodeIndex } from '../services/barcodeIndex'
+
 // ─── Context ────────────────────────────────────────────────────────────────
 
 export type OperationContext = {
@@ -24,6 +26,7 @@ export type OperationContext = {
   platform: Platform
   clock?: Clock
   ids?: IdGenerator
+  barcodeIndex?: BarcodeIndex
 }
 
 type HandlerContext = OperationContext & { services: Services; actor: Actor | null }
@@ -284,7 +287,13 @@ export const operations: Record<IpcChannel, OperationSpec> = {
     mutating: false,
     handle: async (context, payload) => {
       const input = v.payload(payload)
-      return context.services.catalog.lookupBarcodeSummary(v.barcode(input.barcode, 'barcode'))
+      const rawBarcode = v.string(input.barcode, 'barcode', { min: 1, max: 64 })
+      const index = context.barcodeIndex ?? globalBarcodeIndex
+      const entry = index.get(rawBarcode, context.getDatabase())
+      if (entry === undefined) {
+        return serviceErr('not_found', { barcode: rawBarcode })
+      }
+      return context.services.catalog.getProductSummary(entry.productId)
     },
   },
   'catalog:create-product': {
@@ -1166,6 +1175,10 @@ export async function runOperation(
       { ...context, services, actor: context.session.actor() },
       payload,
     )
+    if (result.ok && spec.mutating && (channel.startsWith('catalog:') || channel === 'importExport:execute-products-import')) {
+      const index = context.barcodeIndex ?? globalBarcodeIndex
+      index.invalidate()
+    }
     return result.ok ? { ok: true, value: result.value } : fromService(result.error)
   } catch (error) {
     if (error instanceof ValidationError) {

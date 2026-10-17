@@ -154,6 +154,13 @@ export function ProductsPage({ user, preferences }: ProductsPageProps) {
     try {
       if (payload.mode === 'create') {
         const created = await unwrap(window.api.catalog.createProduct(payload.input))
+        if (payload.initialBarcode) {
+          try {
+            await unwrap(window.api.catalog.addBarcode(created.id, payload.initialBarcode, true))
+          } catch (e) {
+            console.error('Failed to attach initial barcode', e)
+          }
+        }
         await refresh()
         setEditor({ mode: 'edit', id: created.id })
         toast({ message: messages.products.created, kind: 'success' })

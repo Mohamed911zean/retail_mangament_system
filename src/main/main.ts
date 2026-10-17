@@ -16,6 +16,7 @@ import { listPrinters, printSaleReceipt, printTestReceipt } from './printing/pri
 import { isLicenseWriteAllowed, LicenseService } from './license/license-service'
 import { registerIpcHandlers } from './ipc/register'
 import { SessionStore } from './ipc/session'
+import { globalBarcodeIndex } from './services/barcodeIndex'
 import type { Platform } from './ipc/platform'
 
 const rendererUrl = process.env.SMALL_ERP_RENDERER_URL
@@ -165,6 +166,7 @@ app.whenReady().then(async () => {
     restoreBackup: async (fileName: string) => {
       try {
         databaseContext = await restoreDatabaseBackup(requireDatabase(), fileName)
+        globalBarcodeIndex.invalidate()
         return listDatabaseBackups(databaseContext).map(toBackupInfo)
       } catch (error) {
         logAndShowError('Database restore failed.', error)
@@ -190,6 +192,7 @@ app.whenReady().then(async () => {
     getDatabase: () => requireDatabase().database,
     session: new SessionStore(),
     platform,
+    barcodeIndex: globalBarcodeIndex,
   })
 
   await createWindow()

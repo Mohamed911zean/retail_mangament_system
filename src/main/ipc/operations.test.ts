@@ -939,3 +939,61 @@ describe('runOperation — returns over IPC', () => {
     expect(afterVoid.saleReturn.status).toBe('voided')
   })
 })
+
+describe('runOperation — fast barcode index lookup and invalidation over IPC', () => {
+  it('looks up product summary by barcode and refreshes on catalog mutations', async () => {
+    const { context } = await makeContext()
+    await setupOwner(context)
+
+    const product = expectSuccess(
+      await runOperation(
+        'catalog:create-product',
+        { name: 'حليب', baseUnitName: 'piece', qtyScale: 0, costPricePiasters: 1000, sellingPricePiasters: 1500 },
+        context,
+      ),
+    ) as { id: string }
+
+    // Before adding barcode: not found
+    const notFound = expectFailure(
+      await runOperation('catalog:lookup-barcode', { barcode: '2000123003504' }, context),
+    )
+    expect(notFound.code).toBe('not_found')
+
+    // Add barcode (mutating operation -> invalidates barcodeIndex)
+    expectSuccess(
+      await runOperation(
+        'catalog:add-barcode',
+        { productId: product.id, barcode: '2000123003504', isPrimary: true },
+        context,
+      ),
+    )
+
+    // Lookup with Western digits
+    const found = expectSuccess(
+      await runOperation('catalog:lookup-barcode', { barcode: '2000123003504' }, context),
+    ) as { id: string; name: string }
+    expect(found.id).toBe(product.id)
+    expect(found.name).toBe('حليب')
+
+    // Lookup with Arabic-Indic digits
+    const foundArabic = expectSuccess(
+      await runOperation('catalog:lookup-barcode', { barcode: '٢٠٠٠١٢٣٠٠٣٥٠٤' }, context),
+    ) as { id: string }
+    expect(foundArabic.id).toBe(product.id)
+
+    // Remove barcode (mutating operation -> invalidates barcodeIndex)
+    expectSuccess(
+      await runOperation(
+        'catalog:remove-barcode',
+        { productId: product.id, barcode: '2000123003504' },
+        context,
+      ),
+    )
+
+    // Lookup after removal -> not found
+    const notFoundAfter = expectFailure(
+      await runOperation('catalog:lookup-barcode', { barcode: '2000123003504' }, context),
+    )
+    expect(notFoundAfter.code).toBe('not_found')
+  })
+})

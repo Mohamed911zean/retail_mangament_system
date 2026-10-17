@@ -353,3 +353,40 @@ Setup: log in as owner or manager. Cashier has neither `data.import` nor `data.e
 ### NOT verified by the AI in the real GUI / Physical PC:
 - Opening generated `.xlsx` in Microsoft Excel 2016/2019 on a real Windows 10 PC to ensure no font/RTL layout distortion.
 - Testing a 3,000-row file on physical hardware with low RAM (2 GB).
+
+## Step B — Supermarket Pack: Barcode Foundation & Entry Workflows
+
+Setup: log in as owner or manager.
+
+### 1. Pure Check-Digit Validation & Normalization
+- [ ] Open "المنتجات" -> "إضافة منتج".
+- [ ] Type an EAN-13 barcode with correct check digit (e.g. `6223001234562` or `2000123003504`): verify green hint "باركود قياسي سليم" appears.
+- [ ] Change the last digit to an incorrect check digit (e.g. `2000123003505`): verify red warning "رقم التحقق للباركود غير صحيح" appears.
+- [ ] Type with Arabic-Indic digits on Arabic keyboard layout (e.g. `٢٠٠٠١٢٣٠٠٣٥٠٤`): verify digits are accepted and normalized.
+- [ ] Save the product: verify the product is created with the barcode assigned.
+
+### 2. Scanner-Friendly Barcode Entry (Enter -> Add & Refocus)
+- [ ] Edit a product with multiple barcodes.
+- [ ] In the barcode input: scan or type a barcode and press Enter.
+- [ ] Verify the barcode is added immediately to the list without submitting or closing the main dialog.
+- [ ] Verify focus remains in the barcode input so the next barcode can be scanned right away.
+
+### 3. Fast In-Memory Barcode Index (O(1) Lookup)
+- [ ] Verify `catalog:lookupBarcode` retrieves products instantly via the in-memory index.
+- [ ] Verify catalog mutations (adding, removing, importing barcodes) immediately invalidate and refresh the index.
+- [ ] Verify soft-deleted barcodes are excluded from lookups.
+- [ ] Verify UPC-A (12 digits) and EAN-13 (13 digits starting with 0) match seamlessly.
+
+### 4. Unknown Barcode Workflow in POS
+- [ ] In POS ("نقطة البيع"): scan or type a barcode that does NOT exist in the store (e.g. `6229999999991`).
+- [ ] When logged in as owner/manager:
+  - Verify a non-blocking toast appears: "الباركود غير موجود. إضافة منتج جديد؟".
+  - Verify the quick-add product dialog opens with the scanned barcode already prefilled.
+  - Fill in the product name and price, and click "حفظ".
+  - Verify the product is saved, catalog refreshed, and the product is immediately added to the current cart.
+- [ ] When logged in as cashier:
+  - Scan the unknown barcode: verify inline error banner appears ("الباركود غير مسجل في النظام: [code]").
+  - Verify no product creation dialog opens (permission denied for cashiers).
+
+### NOT verified by the AI in the real GUI / Physical PC:
+- Physical USB handheld laser/CCD barcode scanner wedge speed and inter-character timing in real store lighting.
