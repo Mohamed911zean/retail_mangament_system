@@ -13,6 +13,7 @@ import type { PermissionCode, Role } from './permissions'
 import type { BackupInfo } from './backup'
 import type { PrinterInfo, PrintSaleReceiptResult } from './printing'
 import type { LicenseStatus } from './license/api'
+import type { ExportFileResult, ImportMode, ProductsImportPreview, ProductsImportResult } from './importExport'
 import type {
   CategoryRow,
   CustomerRow,
@@ -387,6 +388,11 @@ export const IPC_CHANNELS = [
 
   'license:get-status',
   'license:activate',
+
+  'importExport:get-template',
+  'importExport:export-products',
+  'importExport:preview-products',
+  'importExport:execute-products-import',
 ] as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number]
@@ -527,6 +533,12 @@ export type IpcApi = {
   license: {
     getStatus: () => Promise<IpcResult<LicenseStatus>>
     activate: (key: string) => Promise<IpcResult<LicenseStatus>>
+  }
+  importExport: {
+    getTemplate: (input: { entity: 'products' }) => Promise<IpcResult<ExportFileResult>>
+    exportProducts: (input: { format: 'xlsx' | 'csv'; categoryId?: string | null; search?: string | null }) => Promise<IpcResult<ExportFileResult>>
+    previewProducts: (input: { fileName: string; fileBase64: string; mode: ImportMode }) => Promise<IpcResult<ProductsImportPreview>>
+    executeProductsImport: (input: { fileName: string; fileBase64: string; mode: ImportMode; autoCreateCategories?: boolean }) => Promise<IpcResult<ProductsImportResult>>
   }
 }
 

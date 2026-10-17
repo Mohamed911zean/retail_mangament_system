@@ -315,3 +315,41 @@ counter). Have a completed sale with several units on one line.
 
 ### cancelling purchase invoice 
 --- when i click on the details button on an canceled invoice the reason of the cancelling should appear in the details dialog
+
+## Step A — Supermarket Pack: Excel / CSV Import & Export + Products
+
+Setup: log in as owner or manager. Cashier has neither `data.import` nor `data.export`.
+
+### 1. Template Download & Export
+- [ ] From "المنتجات" or the central "استيراد وتصدير" page: click "تحميل النموذج".
+- [ ] Verify `products_template.xlsx` downloads, has Sheet 1 (المنتجات) with styled header row and text-formatted barcode/SKU columns, and Sheet 2 (تعليمات وإرشادات) explaining each field in Arabic.
+- [ ] Export: click "تصدير (إكسل)" and "تصدير (CSV)". Verify downloaded files contain all current products, barcodes separated by `;`, formatted prices, and stock quantities.
+- [ ] Open the exported CSV in Microsoft Excel: verify Arabic text is intact (UTF-8 BOM), columns are separated by `;` without mangling.
+
+### 2. Products Import Wizard
+- [ ] In "استيراد وتصدير" or "المنتجات": click "استيراد المنتجات".
+- [ ] Mode selector: verify options (إضافة الجديد وتحديث الموجود / إضافة جديد فقط / تحديث الموجود فقط).
+- [ ] Choose a spreadsheet (.xlsx or .csv) with 5+ rows including counted and weighed items, barcodes with leading zeros (e.g. `00123`), and opening stock.
+- [ ] Click next: verify preview shows total rows, counts to create/update/skip, status badges, and any detected new categories.
+- [ ] Click "تأكيد واستيراد": verify atomic import completes, products and categories appear in the database, barcodes are created, and opening stock appears on the products.
+
+### 3. Protection Against Excel Barcode Corruption
+- [ ] Edit a file in Excel and enter a large 13-digit barcode without text formatting so Excel displays it as scientific notation (e.g. `6.22E+12`).
+- [ ] Import the file: verify the row is flagged with the error "الباركود تحوّل لرقم علمي في إكسل، اجعل العمود نص".
+- [ ] Verify import is blocked from applying garbage data.
+
+### 4. Bulk Price Update Mode ("تحديث الأسعار")
+- [ ] Click "تحديث الأسعار".
+- [ ] Choose a sheet with existing barcodes/SKUs and updated selling and cost prices.
+- [ ] Verify preview indicates `update` action and does not alter product names or unit definitions.
+- [ ] Complete import: verify prices are updated and changes are audited.
+
+### 5. Opening Stock Invariant
+- [ ] Re-import the exact same sheet with opening stock quantities: verify opening stock is skipped with a warning, and existing on-hand quantities are NOT doubled.
+
+### 6. Role Permissions
+- [ ] Log in as cashier: verify "استيراد وتصدير" page is hidden from sidebar navigation, and Import / Export / Price Update buttons are hidden on the Products screen.
+
+### NOT verified by the AI in the real GUI / Physical PC:
+- Opening generated `.xlsx` in Microsoft Excel 2016/2019 on a real Windows 10 PC to ensure no font/RTL layout distortion.
+- Testing a 3,000-row file on physical hardware with low RAM (2 GB).

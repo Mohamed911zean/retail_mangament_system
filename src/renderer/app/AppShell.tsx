@@ -19,6 +19,7 @@ import { ReportsPage } from '../pages/reports/ReportsPage'
 import { SalesPage } from '../pages/sales/SalesPage'
 import { ReturnsPage } from '../pages/returns/ReturnsPage'
 import { PosPage } from '../pages/pos/PosPage'
+import { ImportExportPage } from '../pages/importExport/ImportExportPage'
 
 /**
  * The dev gallery is a separate chunk that only exists in a development build:
@@ -41,6 +42,7 @@ const PAGE_HEADINGS: Record<NavKey, { title: string; description?: string }> = {
   customers: { title: messages.pages.customersTitle },
   sales: { title: messages.pages.salesTitle },
   reports: { title: messages.pages.reportsTitle },
+  'import-export': { title: messages.importExport.title, description: messages.importExport.subtitle },
   settings: { title: messages.pages.settingsTitle, description: messages.pages.settingsSubtitle },
   'design-system': { title: messages.nav.designSystem },
 }
@@ -109,6 +111,8 @@ export function AppShell({ user, onLogout, licenseStatus, readOnly, onActivateLi
         return <ReturnsPage user={user} preferences={preferences} />
       case 'inventory':
         return <InventoryPage user={user} preferences={preferences} />
+      case 'import-export':
+        return <ImportExportPage user={user} preferences={preferences} />
       case 'design-system':
         return DevGallery === null ? (
           <PlaceholderPage />

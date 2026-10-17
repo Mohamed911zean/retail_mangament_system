@@ -23,6 +23,7 @@ import type {
   VoidDocumentInput,
 } from '../shared/ipc'
 import type { SettingsKey } from '../shared/settings'
+import type { ImportMode } from '../shared/importExport'
 
 /**
  * Thin, sandboxed bridge. It exposes exactly the channels listed in
@@ -177,6 +178,15 @@ const api: IpcApi = {
   license: {
     getStatus: () => invoke('license:get-status'),
     activate: (key: string) => invoke('license:activate', { key }),
+  },
+  importExport: {
+    getTemplate: (input: { entity: 'products' }) => invoke('importExport:get-template', input),
+    exportProducts: (input: { format: 'xlsx' | 'csv'; categoryId?: string | null; search?: string | null }) =>
+      invoke('importExport:export-products', input),
+    previewProducts: (input: { fileName: string; fileBase64: string; mode: ImportMode }) =>
+      invoke('importExport:preview-products', input),
+    executeProductsImport: (input: { fileName: string; fileBase64: string; mode: ImportMode; autoCreateCategories?: boolean }) =>
+      invoke('importExport:execute-products-import', input),
   },
 }
 

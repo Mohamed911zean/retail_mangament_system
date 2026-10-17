@@ -11,6 +11,7 @@ import { SettingsService, resolveSettingsSync } from '../services/settings'
 import { ShiftService } from '../services/shifts'
 import { UserService } from '../services/users'
 import { VoidService } from '../services/voids'
+import { ImportExportService } from '../services/importExport'
 import { createUlidGenerator, type IdGenerator } from '../services/ids'
 import { systemClock, type Clock } from '../services/clock'
 import { noFaults, type FaultInjector } from '../services/fault-injector'
@@ -31,6 +32,7 @@ export type Services = {
   voids: VoidService
   reports: ReportService
   returns: SaleReturnService
+  importExport: ImportExportService
 }
 
 export type ServiceFactoryDeps = {
@@ -74,5 +76,6 @@ export function createServices(database: DatabaseHandle, deps: ServiceFactoryDep
     voids: new VoidService({ ...common, allowNegativeStock: settings.allow_negative_stock, shiftsEnabled: settings.shifts }),
     reports: new ReportService({ database }),
     returns: new SaleReturnService({ ...common, allowNegativeStock: settings.allow_negative_stock }),
+    importExport: new ImportExportService(common),
   }
 }

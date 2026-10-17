@@ -15,6 +15,8 @@ export type PermissionCode =
   | 'document.void'
   | 'product.price_change'
   | 'product.cost_change'
+  | 'data.import'
+  | 'data.export'
 
 /** The actor is derived from the main-process session, never sent by the renderer. */
 export type Actor = { userId: string; role: Role }
@@ -28,6 +30,8 @@ export const allPermissions: readonly PermissionCode[] = [
   'document.void',
   'product.price_change',
   'product.cost_change',
+  'data.import',
+  'data.export',
 ]
 
 export const rolePermissions: Record<Role, readonly PermissionCode[]> = {

@@ -17,6 +17,12 @@ describe('navItemsForRole', () => {
     expect(navItemsForRole('manager').map((item) => item.key)).toContain('settings')
   })
 
+  it('hides Import/Export from a cashier and shows to owner and manager', () => {
+    expect(navItemsForRole('cashier').map((item) => item.key)).not.toContain('import-export')
+    expect(navItemsForRole('owner').map((item) => item.key)).toContain('import-export')
+    expect(navItemsForRole('manager').map((item) => item.key)).toContain('import-export')
+  })
+
   it('hides the dev gallery unless a dev build asks for it', () => {
     expect(navItemsForRole('owner').map((item) => item.key)).not.toContain('design-system')
     expect(navItemsForRole('owner', { includeDev: true }).map((item) => item.key)).toContain('design-system')

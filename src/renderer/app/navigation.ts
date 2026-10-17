@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import type { Role } from '../../shared/permissions'
 import { messages } from '../i18n'
-import { BoxIcon, CartIcon, ChartIcon, ClipboardIcon, HomeIcon, ReceiptIcon, ReturnIcon, SettingsIcon, StoreIcon, TruckIcon, UsersIcon, WalletIcon, type IconProps } from '../components/icons'
+import { BoxIcon, CartIcon, ChartIcon, ClipboardIcon, HomeIcon, ReceiptIcon, ReturnIcon, SettingsIcon, StoreIcon, TruckIcon, UploadIcon, UsersIcon, WalletIcon, type IconProps } from '../components/icons'
 
 /**
  * Sidebar navigation (design system §4.6).
@@ -27,6 +27,7 @@ export type NavKey =
   | 'customers'
   | 'suppliers'
   | 'reports'
+  | 'import-export'
   | 'settings'
   | 'design-system'
 
@@ -53,6 +54,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'customers', label: messages.nav.customers, icon: UsersIcon, built: true },
   { key: 'suppliers', label: messages.nav.suppliers, icon: StoreIcon, built: true },
   { key: 'reports', label: messages.nav.reports, icon: ChartIcon, built: true },
+  { key: 'import-export', label: messages.nav.importExport, icon: UploadIcon, built: true, roles: ['owner', 'manager'] },
   { key: 'settings', label: messages.nav.settings, icon: SettingsIcon, built: true, roles: ['owner', 'manager'] },
   { key: 'design-system', label: messages.nav.designSystem, icon: BoxIcon, built: true, devOnly: true },
 ]

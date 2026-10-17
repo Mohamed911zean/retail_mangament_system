@@ -1,5 +1,5 @@
 import type { Actor, PermissionCode } from '../../shared/permissions'
-import { rolePermissions } from '../../shared/permissions'
+import { rolePermissions, roleHasPermission } from '../../shared/permissions'
 import type { ServiceResult } from './result'
 import { serviceErr, serviceOk } from './result'
 
@@ -7,7 +7,7 @@ import { serviceErr, serviceOk } from './result'
 // so the renderer can hide what a role cannot use. Enforcement always happens
 // here, in the main process.
 export type { Actor, PermissionCode }
-export { rolePermissions }
+export { rolePermissions, roleHasPermission }
 
 export function assertPermission(actor: Actor, permission: PermissionCode): ServiceResult<true> {
   return rolePermissions[actor.role].includes(permission)

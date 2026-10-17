@@ -1056,6 +1056,59 @@ export const operations: Record<IpcChannel, OperationSpec> = {
       return ok(await context.platform.activateLicense(v.string(input.key, 'key', { min: 8, max: 4096 })))
     },
   },
+
+  // ── Import / Export ────────────────────────────────────────────────────────
+  'importExport:get-template': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      const entity = v.oneOf(input.entity, 'entity', ['products'] as const)
+      if (entity === 'products') {
+        return context.services.importExport.getProductsTemplate()
+      }
+      return serviceErr('not_found')
+    },
+  },
+  'importExport:export-products': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      const format = v.oneOf(input.format, 'format', ['xlsx', 'csv'] as const)
+      const categoryId = v.optionalId(input.categoryId, 'categoryId') ?? null
+      const search = v.optionalText(input.search, 'search', { max: 100 }) ?? null
+      return context.services.importExport.exportProducts(requireActor(context), { format, categoryId, search })
+    },
+  },
+  'importExport:preview-products': {
+    auth: true,
+    mutating: false,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      const fileName = v.string(input.fileName, 'fileName', { max: 255 })
+      const fileBase64 = v.string(input.fileBase64, 'fileBase64')
+      const mode = v.oneOf(input.mode, 'mode', ['create_only', 'update_only', 'both', 'price_update_only'] as const)
+      return context.services.importExport.previewProductsImport(requireActor(context), { fileName, fileBase64, mode })
+    },
+  },
+  'importExport:execute-products-import': {
+    auth: true,
+    mutating: true,
+    handle: async (context, payload) => {
+      const input = v.payload(payload)
+      const fileName = v.string(input.fileName, 'fileName', { max: 255 })
+      const fileBase64 = v.string(input.fileBase64, 'fileBase64')
+      const mode = v.oneOf(input.mode, 'mode', ['create_only', 'update_only', 'both', 'price_update_only'] as const)
+      const autoCreateCategories = v.boolean(input.autoCreateCategories, 'autoCreateCategories', true)
+      return context.services.importExport.executeProductsImport(requireActor(context), {
+        fileName,
+        fileBase64,
+        mode,
+        autoCreateCategories,
+      })
+    },
+  },
 }
 
 /** Only the settings the UI is allowed to write, typed per key. */

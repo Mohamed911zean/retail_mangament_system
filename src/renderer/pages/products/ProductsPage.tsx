@@ -17,10 +17,11 @@ import {
   TRow,
 } from '../../components/ui'
 import { Badge } from '../../components/ui'
-import { BoxIcon, TrashIcon } from '../../components/icons'
+import { BoxIcon, DownloadIcon, TrashIcon, UploadIcon } from '../../components/icons'
 import { messages, translate } from '../../i18n'
 import { errorKey, unwrap } from '../../lib/ipc'
 import { formatMoney, formatQty } from '../../lib/format'
+import { downloadBase64File } from '../../lib/download'
 import type { Preferences } from '../../lib/preferences'
 import { useToast } from '../../lib/toast'
 import type { CurrentUser, ProductSummary } from '../../../shared/ipc'
@@ -28,6 +29,7 @@ import type { CategoryRow } from '../../../shared/rows'
 import { canEditCost, canEditPrice, canManageCatalog, filterProducts, isLowStock } from './productFilter'
 import { CategoryDialog } from './CategoryDialog'
 import { ProductDialog, type SavePayload } from './ProductDialog'
+import { ImportExportDialog } from './ImportExportDialog'
 
 /**
  * The products screen (screen 1): the shop's catalog with its categories.
@@ -67,6 +69,31 @@ export function ProductsPage({ user, preferences }: ProductsPageProps) {
   const canManage = canManageCatalog(user.role)
   const priceEditable = canEditPrice(user.permissions)
   const costEditable = canEditCost(user.permissions)
+  const canImport = user.permissions.includes('data.import')
+  const canExport = user.permissions.includes('data.export')
+
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importDialogMode, setImportDialogMode] = useState<'both' | 'price_update_only'>('both')
+  const [exporting, setExporting] = useState(false)
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const res = await unwrap(
+        window.api.importExport.exportProducts({
+          format: 'xlsx',
+          categoryId: categoryFilter === '' ? null : categoryFilter,
+          search: query.trim() || null,
+        }),
+      )
+      downloadBase64File(res.fileBase64, res.fileName, res.mimeType)
+      toast({ message: 'تم تصدير المنتجات بنجاح', kind: 'success' })
+    } catch (err) {
+      setDialogError(translate(errorKey(err)))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   // The catalog is IPC data the page cannot render without asking.
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -294,6 +321,35 @@ export function ProductsPage({ user, preferences }: ProductsPageProps) {
             </Button>
           </>
         )}
+        {canExport && (
+          <Button variant="outline" loading={exporting} onClick={() => void handleExport()}>
+            <DownloadIcon size={16} />
+            {messages.importExport.exportXlsx}
+          </Button>
+        )}
+        {canImport && (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportDialogMode('price_update_only')
+                setImportDialogOpen(true)
+              }}
+            >
+              {messages.importExport.bulkPriceUpdate}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportDialogMode('both')
+                setImportDialogOpen(true)
+              }}
+            >
+              <UploadIcon size={16} />
+              {messages.importExport.importProducts}
+            </Button>
+          </>
+        )}
       </div>
 
       {renderBody()}
@@ -410,6 +466,14 @@ export function ProductsPage({ user, preferences }: ProductsPageProps) {
           <p className="text-sm text-secondary">{messages.products.deleteProductBody}</p>
         </div>
       </Dialog>
+
+      <ImportExportDialog
+        open={importDialogOpen}
+        initialMode={importDialogMode}
+        digitStyle={digitStyle}
+        onClose={() => setImportDialogOpen(false)}
+        onSuccess={() => void refresh()}
+      />
     </div>
   )
 }

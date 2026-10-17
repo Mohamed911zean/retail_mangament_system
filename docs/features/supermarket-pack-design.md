@@ -368,7 +368,7 @@ The human must decide before implementation of G.
 ## Implementation checklist (for the AI to track)
 
 - [x] Pre-brief fixes (table, expiry picker, void reason) — already committed
-- [ ] Step A: exceljs eval + import/export infrastructure + Products import/export
+- [x] Step A: exceljs eval + import/export infrastructure + Products import/export
 - [ ] Step B: Barcode foundation + index + unknown-barcode POS flow
 - [ ] Step C: Scan detector + POS wiring + audio
 - [ ] Step D: Scale barcode decoder + migration 0010

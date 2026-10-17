@@ -43,4 +43,8 @@ export const arabicServiceMessages = {
   'errors.unknown_channel': 'طلب غير معروف. أعد تشغيل التطبيق',
   'errors.setup_already_completed': 'تم إنشاء حساب المالك مسبقاً، سجّل الدخول باسمك وكلمة المرور',
   'errors.customer_has_balance': 'لا يمكن حذف عميل عليه رصيد مستحق، سجّل دفعة أولاً',
+  'errors.file_too_large': 'حجم الملف يتجاوز الحد المسموح به (20 ميجابايت)',
+  'errors.row_limit_exceeded': 'عدد الصفوف في الملف يتجاوز الحد المسموح به (20,000 صف)',
+  'errors.empty_file': 'الملف فارغ أو لا يحتوي على صفوف بيانات',
+  'errors.invalid_file_format': 'صيغة الملف غير مدعومة، يرجى اختيار ملف إكسل أو ملف مفصول بفواصل',
 } as const

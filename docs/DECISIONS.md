@@ -854,6 +854,11 @@ transaction after every stock movement.
 - Price/cost columns in an import additionally require the existing
   `product.price_change` / `product.cost_change` codes; columns without
   permission are silently ignored with a visible Arabic warning.
+- Opening stock in bulk product import: applied via `StockEngine.applyMovement`
+  with movementType `'adjustment'` and reason `'opening_balance'`, valued at
+  `calculateIncomingValueAtAverage` (qty * cost). Only applied when the product's
+  on-hand quantity is 0 and no prior stock movements exist, otherwise skipped
+  with a warning to prevent double-counting.
 - Every import writes one audit row (entity, file name, counts, mode;
   never file content).
 - No migration required: permission codes live in code, not tables.
